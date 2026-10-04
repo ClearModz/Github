@@ -49,6 +49,8 @@ h2{font-size:clamp(28px,4vw,48px);margin:0 0 .3em;letter-spacing:-.02em}
 .pane{position:relative;height:62vh;min-height:380px;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
 .pane>div:first-child{position:absolute;inset:0}
 .chip{position:absolute;z-index:5;left:12px;top:12px;padding:6px 12px;border-radius:99px;background:rgba(10,14,20,.85);font-size:12px;border:1px solid var(--line)}
+.revchip{background:#ffb020;color:#1a1000;padding:5px 9px;border-radius:9px;text-align:center;font-size:14px;line-height:1.15;box-shadow:0 4px 18px rgba(0,0,0,.5);pointer-events:none;border:2px solid #1a1000}
+.revchip small{display:block;font-size:10px;font-weight:600;letter-spacing:.04em}
 .chip.h{left:12px;top:48px;color:var(--mute);font-size:11px}
 .chip.r{left:auto;right:12px;top:auto;bottom:28px}
 .legend{position:absolute;z-index:5;left:12px;bottom:28px;padding:8px 12px;border-radius:10px;background:rgba(10,14,20,.88);font-size:11px;border:1px solid var(--line)}
@@ -294,10 +296,49 @@ let quizActive=false,pin=null,mk=[],score=[0,0],cur=null;
 const shuffle=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
 
 async function pointAir(lon,lat){
-  const q=new URLSearchParams({where:"CLASS IN ('B','C','D','E')",geometry:lon+','+lat,geometryType:'esriGeometryPoint',inSR:4326,spatialRel:'esriSpatialRelIntersects',outFields:'*',returnGeometry:'false',f:'geojson'});
+  const q=new URLSearchParams({where:"CLASS IN ('B','C','D','E')",geometry:lon+','+lat,geometryType:'esriGeometryPoint',inSR:4326,spatialRel:'esriSpatialRelIntersects',outFields:'*',returnGeometry:'true',outSR:4326,maxAllowableOffset:0.002,geometryPrecision:4,f:'geojson'});
   const j=await (await fetch(AIR+'?'+q)).json();
   if(!j.features) throw new Error();
   return j.features.map(enrich);
+}
+// ---------- show the answer on the sectional ----------
+let revealMk=[];
+function clearReveal(){
+  ['reveal-line','reveal-glow','reveal-fill'].forEach(l=>mapL.getLayer(l)&&mapL.removeLayer(l));
+  if(mapL.getSource('reveal'))mapL.removeSource('reveal');
+  revealMk.forEach(m=>m.remove());revealMk=[];
+}
+const hundreds=ft=>ft==null?'–':Math.round(ft/100);
+// the chart prints limits in hundreds of feet MSL: ceiling on top, floor underneath ("SFC" = surface)
+function chartLimits(p){
+  const hi=toFt(p.UPPER_VAL,p.UPPER_UOM,p.UPPER_CODE),lo=toFt(p.LOWER_VAL,p.LOWER_UOM,p.LOWER_CODE);
+  return `${hundreds(hi)}<br>${lo===0?'SFC':hundreds(lo)}`;
+}
+function revealOnChart(feat,cls,showLimits){
+  clearReveal();
+  const g=feat&&feat.geometry;
+  const polys=g?(g.type==='Polygon'?[g.coordinates]:g.type==='MultiPolygon'?g.coordinates:[]):[];
+  const bb=new maplibregl.LngLatBounds(pin,pin);
+  let data,anchor,label;
+  if(polys.length){
+    polys.forEach(r=>r[0].forEach(c=>bb.extend(c)));
+    data={type:'Feature',geometry:g,properties:{}};
+    let bd=1e9;anchor=pin;                      // charted limits sit on the boundary: use the edge nearest the pin
+    polys.forEach(r=>r[0].forEach(c=>{const d=Math.hypot((c[0]-pin[0])*Math.cos(pin[1]*Math.PI/180),c[1]-pin[1]);if(d<bd){bd=d;anchor=c}}));
+    label=(showLimits?'<b>'+chartLimits(feat.properties)+'</b>':'')+`<small>Class ${cls}</small>`;
+  }else{                                         // Class G: there is no boundary to find
+    const ring=[...Array(49)].map((_,i)=>[pin[0]+.05*Math.cos(2*Math.PI*i/48),pin[1]+.04*Math.sin(2*Math.PI*i/48)]);
+    data={type:'Feature',geometry:{type:'Polygon',coordinates:[ring]},properties:{}};
+    ring.forEach(c=>bb.extend(c));anchor=ring[12];
+    label='<small>Class G</small><small>no airspace lines here</small>';
+  }
+  mapL.addSource('reveal',{type:'geojson',data});
+  mapL.addLayer({id:'reveal-fill',type:'fill',source:'reveal',paint:{'fill-color':'#ffb020','fill-opacity':.14}});
+  mapL.addLayer({id:'reveal-glow',type:'line',source:'reveal',paint:{'line-color':'#ffb020','line-width':10,'line-opacity':.3,'line-blur':4}});
+  mapL.addLayer({id:'reveal-line',type:'line',source:'reveal',paint:{'line-color':'#ffd166','line-width':3}});
+  const el=document.createElement('div');el.className='revchip mono';el.innerHTML=label;
+  revealMk.push(new maplibregl.Marker({element:el}).setLngLat(anchor).addTo(mapL));
+  mapL.fitBounds(bb,{padding:{top:70,bottom:70,left:70,right:70},maxZoom:11.5,duration:1400});
 }
 function setQuizVis(on){
   quizActive=on;const v=on?'none':'visible';
@@ -316,6 +357,7 @@ function mark(ok,btn,correct){
 function next(){const n=document.createElement('button');n.className='btn sm';n.textContent='Next pin →';n.onclick=startQuiz;n.style.marginTop='10px';$('fb').appendChild(n)}
 
 async function startQuiz(){
+  clearReveal();
   mk.forEach(m=>m.remove());mk=[];
   const [la,lo]=SPOTS[Math.floor(Math.random()*SPOTS.length)];
   pin=[lo+(Math.random()-.5)*.3,la+(Math.random()-.5)*.25];
@@ -329,17 +371,22 @@ async function startQuiz(){
   showQ('<b>Q1.</b> Use the sectional (left). What is the <u>highest-priority airspace class</u> at the amber pin?',['Class B','Class C','Class D','Class E','Class G'],(t,b)=>{
     const ok=t==='Class '+cls;mark(ok,b,'Class '+cls);setQuizVis(false);
     const p=top?.properties;
-    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} It’s <b>Class ${cls}</b>${p?` — ${p.NAME||''}, floor ${p.floor}, ceiling ${p.ceil}`:''}.<br>${KEY[cls]}<br>`;
-    if(top&&p.ceil!=='n/a'){const n=document.createElement('button');n.className='btn sm';n.textContent='Q2: ceiling →';n.style.marginTop='10px';n.onclick=()=>q2(p);$('fb').appendChild(n)}else next();
+    if(!ok)revealOnChart(top,cls,false);
+    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} It’s <b>Class ${cls}</b>${p?` — ${p.NAME||''}, floor ${p.floor}, ceiling ${p.ceil}`:''}.<br>${KEY[cls]}<br>${ok?'':'📍 Look at the sectional (left): the correct airspace is outlined in amber.<br>'}`;
+    if(top&&p.ceil!=='n/a'){const n=document.createElement('button');n.className='btn sm';n.textContent='Q2: ceiling →';n.style.marginTop='10px';n.onclick=()=>q2(top);$('fb').appendChild(n)}else next();
   });
 }
-function q2(p){
+function q2(feat){
+  const p=feat.properties;
+  clearReveal();
+  mapL.fitBounds(new maplibregl.LngLatBounds(pin,pin).extend([pin[0]+.2,pin[1]+.15]).extend([pin[0]-.2,pin[1]-.15]),{maxZoom:10.5,duration:900});
   setQuizVis(true);
   const pool=['2,500 ft MSL','3,000 ft MSL','4,000 ft MSL','4,100 ft MSL','6,000 ft MSL','7,000 ft MSL','10,000 ft MSL','14,500 ft MSL','18,000 ft MSL'].filter(x=>x!==p.ceil);
   const opts=shuffle([p.ceil,...shuffle(pool).slice(0,3)]);
   showQ(`<b>Q2.</b> What is the <u>ceiling</u> of that Class ${p.CLASS} airspace (${p.NAME||'at the pin'})?`,opts,(t,b)=>{
     const ok=t===p.ceil;mark(ok,b,p.ceil);setQuizVis(false);
-    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} Ceiling <b>${p.ceil}</b>, floor <b>${p.floor}</b>. On the sectional, look for the numbers in the boundary: the top is the upper value, the bottom is the lower (“SFC” means surface).<br>`;
+    if(!ok)revealOnChart(feat,p.CLASS,true);
+    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} Ceiling <b>${p.ceil}</b>, floor <b>${p.floor}</b>. On the sectional, look for the numbers in the boundary: the top is the upper value, the bottom is the lower (“SFC” means surface).<br>${ok?'':'📍 The amber tag on the sectional (left) shows how the chart prints it, in hundreds of feet: ceiling over floor.<br>'}`;
     next();
   });
 }
