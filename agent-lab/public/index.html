@@ -2001,7 +2001,19 @@ window.onFactoryControl = cmd => { bridge('POST', '/control', cmd).catch(bridgeE
 function loadAgentFiles() {
   return bridge('GET', '/agents').then(list => { list.forEach(a => { roles[a.key] = a.prompt; }); renderRoles(); }).catch(bridgeErr);
 }
+function checkLogin(tries) {
+  bridge('GET', '/health').then(h => {
+    if (h.claude === 'checking' && tries < 6) { setTimeout(() => checkLogin(tries + 1), 3000); return; }
+    const old = document.getElementById('loginWarn'); if (old) old.remove();
+    if (h.claude === 'ok' || h.claude === 'checking') return;
+    const p = document.createElement('p'); p.id = 'loginWarn'; p.className = 'note bad';
+    p.innerHTML = '<b>Claude Code is not working on this computer:</b> ' + esc(h.claude) + '<br>Open Terminal, run <code>claude</code> and sign in (or set ANTHROPIC_API_KEY), then restart Agent Lab. <button class="sm" id="loginRetry">Check again</button>';
+    $('capStatus').after(p);
+    $('loginRetry').onclick = () => bridge('POST', '/health/recheck').then(() => checkLogin(0)).catch(bridgeErr);
+  }).catch(() => {});
+}
 function connectBridge() {
+  checkLogin(0);
   loadJobs();
   loadAgentFiles();
   $('liveBtns').hidden = false;

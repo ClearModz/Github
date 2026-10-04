@@ -96,6 +96,7 @@ export async function runAgent(key: AgentKey, prompt: string, jobId: number, hoo
   const timer = setTimeout(() => ac.abort(), STAGE_TIMEOUT_MS);
   const t0 = Date.now();
   let streamed = '';
+  let stderrTail = '';
   let final: string | null = null;
   let model: string | undefined;
   try {
@@ -112,6 +113,7 @@ export async function runAgent(key: AgentKey, prompt: string, jobId: number, hoo
         maxTurns: Number(process.env.AGENT_LAB_MAX_TURNS ?? 25),
         model: def.model ?? process.env.AGENT_LAB_MODEL,
         abortController: ac,
+        stderr: (d: string) => { stderrTail = (stderrTail + d).slice(-600); },
         permissionMode: 'default',
         canUseTool: async (name, input) => {
           if (!tools.includes(name)) return { behavior: 'deny', message: `${name} is not enabled for ${def.name}.` };
@@ -142,11 +144,16 @@ export async function runAgent(key: AgentKey, prompt: string, jobId: number, hoo
           }
       } else if (m.type === 'result') {
         if (m.subtype === 'success' && !m.is_error) final = m.result;
-        else throw new Error(`Agent ${def.name} failed: ${m.subtype}${'errors' in m && Array.isArray(m.errors) ? ' ' + m.errors.join('; ') : ''}`);
+        else {
+          // an error result carries the real reason (not logged in, bad model, rate limit...) in `result` or `errors`
+          const why = [m.subtype === 'success' ? m.result : '', 'errors' in m && Array.isArray(m.errors) ? m.errors.join('; ') : ''].filter(Boolean).join(' ').trim();
+          throw new Error(`${def.name} could not run: ${why || m.subtype}`);
+        }
       }
     }
   } catch (e) {
     if (hooks.signal?.aborted) throw new Error('Cancelled.');
+    if (!ac.signal.aborted && stderrTail.trim() && !/could not run/.test((e as Error).message)) throw new Error(`${def.name} could not run: ${(e as Error).message} ${stderrTail.trim().split('\n').slice(-3).join(' ')}`);
     if (ac.signal.aborted) throw new Error(`Agent ${def.name} timed out after ${Math.round(STAGE_TIMEOUT_MS / 1000)}s.`);
     throw e;
   } finally {
@@ -170,4 +177,23 @@ export async function writeAgentPrompt(key: AgentKey, prompt: string): Promise<v
   if (!m) throw new Error('Agent file has no frontmatter.');
   await writeFile(file + '.bak', raw);
   await writeFile(file, m[1] + prompt.trim() + '\n');
+}
+
+/** One tiny, tool-less request to confirm Claude Code can actually reach the API from this machine. */
+export async function preflight(): Promise<string> {
+  const cwd = path.join(WORK_DIR, 'preflight');
+  mkdirSync(cwd, { recursive: true });
+  let stderrTail = '';
+  try {
+    const q = query({ prompt: 'Reply with the single word OK.', options: { tools: [], cwd, settingSources: [], persistSession: false, maxTurns: 1, model: process.env.AGENT_LAB_MODEL, stderr: (d: string) => { stderrTail = (stderrTail + d).slice(-400); } } });
+    for await (const m of q) {
+      if (m.type === 'result') {
+        if (m.subtype === 'success' && !m.is_error) return 'ok';
+        return `${m.subtype === 'success' ? m.result : m.subtype}`.trim();
+      }
+    }
+    return 'No response from Claude Code.';
+  } catch (e) {
+    return `${(e as Error).message} ${stderrTail.trim().split('\n').slice(-2).join(' ')}`.trim();
+  }
 }

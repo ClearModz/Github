@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { Orchestrator, type PageEvent } from './orchestrator.js';
 import { AGENT_KEYS, TEMPLATES } from './types.js';
-import { AGENTS_DIR, readAgentFile, writeAgentPrompt } from './agents.js';
+import { AGENTS_DIR, preflight, readAgentFile, writeAgentPrompt } from './agents.js';
 import { DATA_DIR } from './store.js';
 
 const PORT = Number(process.env.PORT ?? 3210);
@@ -32,7 +32,11 @@ const fail = (res: express.Response, code: number, error: string) => res.status(
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
 
 app.get('/jobs', (_req, res) => res.json([...orch.jobs.values()].sort((a, b) => a.num - b.num)));
-app.get('/health', (_req, res) => res.json({ ok: true, agentsDir: AGENTS_DIR, dataDir: DATA_DIR, jobs: orch.jobs.size }));
+let claudeStatus = 'checking';
+const checkClaude = () => { claudeStatus = 'checking'; return preflight().then(r => { claudeStatus = r; console.log(r === 'ok' ? 'Claude login: ok' : `Claude login PROBLEM: ${r}`); }); };
+void checkClaude();
+app.get('/health', (_req, res) => res.json({ ok: true, claude: claudeStatus, agentsDir: AGENTS_DIR, dataDir: DATA_DIR, jobs: orch.jobs.size }));
+app.post('/health/recheck', async (_req, res) => { await checkClaude(); res.json({ claude: claudeStatus }); });
 
 app.post('/jobs', (req, res) => {
   const b = req.body ?? {};
