@@ -1,0 +1,43 @@
+<!--{"title":"Privacy","description":"What Chartroom stores on your device, which services your browser contacts, and how to clear saved location data.","section":"privacy","scripts":"<script src=\"{{root}}assets/js/privacy.js\" defer></script>"}-->
+<header class="page-head">
+  <div class="wrap">
+    <h1 class="reveal">Privacy</h1>
+    <p class="lead reveal" style="--d:1">No accounts, no ads and no cookies. Your location is used only if you switch it on, and it stays in your browser.</p>
+    <p class="meta-line mono reveal" style="--d:2">Last updated {{updated}}</p>
+  </div>
+</header>
+<div class="wrap">
+  <div class="prose">
+    <h2>What this site collects</h2>
+    <p>Chartroom has no accounts and no server of its own that stores information about you. It sets no cookies.</p>
+    {{analytics_note}}
+    {{error_note}}
+
+    <h2>Your location</h2>
+    <p>Location is <strong>off</strong> until you turn on <strong>Use my location</strong> in Sectional Practice. Your browser then asks for permission, and you can refuse.</p>
+    <p>If you allow it, the page works out which airports are near you inside your browser. Your coordinates are not sent to Chartroom or to any service it uses.</p>
+    <p>To avoid downloading the airport list again, the page saves two things in your browser’s local storage for up to 30 days: your position rounded to a tenth of a degree (roughly 7 miles), and the list of nearby airports, which is public data. This button deletes both and anything else Chartroom saved.</p>
+    <p><button class="btn sm" id="clear-local" type="button">Clear saved location data</button> <span id="clear-status" role="status" aria-live="polite" class="mono" style="margin-left:10px;font-size:13px;color:var(--mute)"></span></p>
+
+    <h2>Services your browser contacts</h2>
+    <p>The map pages load data straight from other services. Each one can see your IP address and browser details, as any website can, and handles them under its own policy. Fonts, icons and the map libraries are served from this site, not from a third party.</p>
+    <ul>
+      <li><strong>FAA services on arcgis.com</strong> supply the sectional chart tiles and the airspace data. Requests include which tiles or which map area you are viewing.</li>
+      <li><strong>Amazon Web Services</strong> supplies terrain tiles. Requests include tile numbers.</li>
+      <li><strong>OpenFreeMap</strong> supplies the base map under the airspace. Requests include tile numbers.</li>
+      <li><strong>MapLibre demo servers</strong> supply the lettering for airspace labels. Requests do not include a map position.</li>
+      <li><strong>GitHub</strong> serves the public OurAirports list, only when you turn on location. Everyone downloads the same file, so the request does not reveal where you are.</li>
+    </ul>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li>Turn <strong>Use my location</strong> off at any time. The built-in example airports are used instead.</li>
+      <li>Use the button above to clear what the page saved.</li>
+      <li>Revoke the permission from the lock icon beside the address bar.</li>
+      <li>Browsers also let you clear all site data for Chartroom.</li>
+    </ul>
+
+    <h2>Changes to this page</h2>
+    <p>If Chartroom starts using accounts, analytics or another service, this page will be updated first. The date at the top shows when it last changed.</p>
+  </div>
+</div>

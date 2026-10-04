@@ -1,0 +1,13 @@
+{
+  "siteName": "Chartroom",
+  "siteUrl": "",
+  "basePath": "/",
+  "analytics": {
+    "provider": "none",
+    "domain": "",
+    "endpoint": ""
+  },
+  "errorLogging": {
+    "endpoint": ""
+  }
+}

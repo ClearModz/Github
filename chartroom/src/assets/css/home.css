@@ -1,0 +1,50 @@
+/* Home page. Shared tokens and components live in site.css. */
+.hero{position:relative;overflow:hidden;min-height:100dvh;display:flex;align-items:center;padding:calc(var(--nav-h) + 56px) 0 72px}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 55% at 78% 50%,rgba(255,176,32,.10),transparent 70%);pointer-events:none}
+.hero h1{font-size:clamp(38px,5.6vw,80px);max-width:16ch}
+.hero-copy{position:relative;z-index:1;display:grid;gap:26px;justify-items:start;max-width:780px}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:6px}
+.hero-visual{position:absolute;right:-8vw;top:50%;width:min(92vmin,880px);aspect-ratio:1;transform:translateY(-50%);opacity:.55;pointer-events:none}
+.hero-visual svg{width:100%;height:100%}
+.hero-visual circle{fill:none;stroke:#26354b;stroke-width:1}
+.hero-visual line{stroke:#1e2a3b;stroke-width:1}
+.hero-visual .sweep{transform-origin:50% 50%;animation:sweep 14s linear infinite}
+@keyframes sweep{to{transform:rotate(360deg)}}
+@media (max-width:760px){.hero-visual{opacity:.28;right:-30vw}}
+
+/* what works today: an asymmetric bento with exactly four cells */
+.bento{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.b1{grid-column:span 7;grid-row:span 2}
+.b2{grid-column:span 5}
+.b3{grid-column:span 5}
+.b4{grid-column:span 12}
+.card-t{display:grid;gap:14px;align-content:start}
+.b1 .card-t{gap:20px;min-height:100%}
+.b1 h3{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.025em}
+.card-t p{color:var(--mute);max-width:46ch;text-wrap:pretty}
+.b4 .card-t{grid-template-columns:auto 1fr;align-items:center;column-gap:20px}
+.b4 .card-t p{max-width:70ch}
+@media (max-width:860px){.bento>*{grid-column:1/-1;grid-row:auto}.b4 .card-t{grid-template-columns:1fr}}
+
+/* topics: a 2 x 4 grid of tiles, no card chrome, one of them live */
+.topics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.topic{display:flex;gap:16px;align-items:flex-start;padding:20px;border-radius:var(--r-inner);color:inherit;text-decoration:none;transition:background-color .4s var(--ease)}
+a.topic:hover{background:rgba(255,255,255,.05)}
+.topic.live{background:rgba(255,176,32,.08)}
+.topic h3{font-size:17px}
+.topic p{margin-top:4px;color:var(--mute);font-size:14px}
+.topic .st{display:block;margin-top:10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.topic.live .st{color:var(--ok)}
+.topic .ico{width:40px;height:40px;font-size:20px}
+@media (max-width:700px){.topics{grid-template-columns:1fr}}
+
+/* location explainer */
+.split-2{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,6vw,96px);align-items:start}
+.split-2 .sec-head{margin-bottom:0;position:sticky;top:120px}
+.facts{list-style:none;margin:0;padding:0;display:grid;gap:26px}
+.facts li{display:flex;gap:16px;align-items:flex-start}
+.facts strong{display:block;font-weight:600;font-size:17px}
+.facts p{margin-top:4px;color:var(--mute);font-size:15px;max-width:48ch;text-wrap:pretty}
+@media (max-width:860px){.split-2{grid-template-columns:1fr}.split-2 .sec-head{position:static;margin-bottom:8px}}
+
+@media (prefers-reduced-motion:reduce){.hero-visual .sweep{animation:none}}

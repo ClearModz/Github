@@ -1,183 +1,5 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0a0e14">
-<link rel="preconnect" href="https://unpkg.com" crossorigin>
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<title>Chartroom — Private Pilot Study</title>
-<meta name="description" content="Study for the US Private Pilot checkride. Practice reading sectionals in 3D next to live airspace.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600;800&display=swap" rel="stylesheet">
-<link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
-<style>
-:root{color-scheme:dark;--bg:#0a0e14;--panel:#111824;--line:#1e2a3b;--ink:#e8eef7;--mute:#8a9bb3;--amber:#ffb020;--blue:#3b82f6;--mag:#d946ef;--ok:#34d399;--bad:#f87171}
-*{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Sora,system-ui,sans-serif;line-height:1.5}
-a{color:inherit}
-.mono{font-family:'JetBrains Mono',monospace}
-nav{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;padding:14px 5vw;background:rgba(10,14,20,.8);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
-nav b{letter-spacing:.14em;font-size:14px}nav b span{color:var(--amber)}
-nav div a{margin-left:22px;text-decoration:none;color:var(--mute);font-size:14px}nav div a:hover{color:var(--ink)}
-.hero{position:relative;overflow:hidden;padding:12vh 5vw 14vh;min-height:88vh;display:flex;flex-direction:column;justify-content:center}
-.hero svg{position:absolute;right:-10vw;top:50%;width:90vmin;height:90vmin;transform:translateY(-50%);opacity:.5;pointer-events:none}
-.hero svg circle{fill:none;stroke:var(--line);stroke-width:1}
-.hero svg .sweep{transform-origin:50% 50%;animation:spin 8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.eyebrow{color:var(--amber);font-size:13px;letter-spacing:.2em;text-transform:uppercase}
-h1{font-size:clamp(40px,8vw,104px);line-height:.98;margin:.25em 0;font-weight:800;letter-spacing:-.03em;max-width:12ch}
-h1 em{font-style:normal;background:linear-gradient(90deg,var(--amber),#ff6a3d);-webkit-background-clip:text;color:transparent}
-.lead{max-width:52ch;color:var(--mute);font-size:18px}
-.btn{display:inline-block;margin-top:28px;padding:14px 26px;background:var(--amber);color:#1a1000;font-weight:600;border:0;border-radius:999px;text-decoration:none;cursor:pointer;font:600 15px Sora;transition:transform .2s,box-shadow .2s}
-.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(255,176,32,.3)}
-.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);margin-left:10px}
-.btn.sm{margin:0;padding:8px 16px;font-size:13px}
-section{padding:10vh 5vw}
-h2{font-size:clamp(28px,4vw,48px);margin:0 0 .3em;letter-spacing:-.02em}
-.reveal{opacity:0;transform:translateY(24px);transition:.7s cubic-bezier(.2,.7,.2,1)}.reveal.in{opacity:1;transform:none}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:30px}
-.card{padding:22px;border:1px solid var(--line);border-radius:16px;background:var(--panel);transition:.25s}
-.card:hover{border-color:var(--amber);transform:translateY(-3px)}
-.card .mono{color:var(--amber);font-size:12px}.card h3{margin:.4em 0 .2em}.card p{margin:0;color:var(--mute);font-size:14px}
-.tag{display:inline-block;margin-top:12px;font-size:11px;padding:3px 10px;border-radius:99px;border:1px solid var(--line);color:var(--mute)}
-.tag.live{color:var(--ok);border-color:var(--ok)}
-/* practice */
-#practice{padding-top:8vh;background:linear-gradient(#0a0e14,#0d1420)}
-.bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin:18px 0;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:var(--panel);font-size:13px}
-.bar label{display:flex;align-items:center;gap:8px;color:var(--mute)}
-.bar input[type=range]{accent-color:var(--amber);width:110px}
-.split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.pane{position:relative;height:62vh;min-height:380px;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
-.pane>div:first-child{position:absolute;inset:0}
-.chip{position:absolute;z-index:5;left:12px;top:12px;padding:6px 12px;border-radius:99px;background:rgba(10,14,20,.85);font-size:12px;border:1px solid var(--line)}
-.revchip{background:#ffb020;color:#1a1000;padding:5px 9px;border-radius:9px;text-align:center;font-size:14px;line-height:1.15;box-shadow:0 4px 18px rgba(0,0,0,.5);pointer-events:none;border:2px solid #1a1000}
-.revchip small{display:block;font-size:10px;font-weight:600;letter-spacing:.04em}
-button,label,input[type=range],input[type=checkbox]{touch-action:manipulation}
-.btn:focus-visible,.opt:focus-visible,#quiz button:focus-visible,.bar input:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
-.bar .loc{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:12px 32px;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:#0d1420}
-.bar .loc label.sw{position:relative;display:flex;align-items:center;gap:14px;min-height:44px;cursor:pointer;color:var(--ink)}
-.bar .loc .sw input{position:absolute;left:0;top:50%;width:48px;height:44px;margin:-22px 0 0;opacity:0;cursor:pointer}
-.bar .loc .track{position:relative;flex:none;width:48px;height:28px;border-radius:999px;background:#18222f;border:1px solid var(--line);transition:background-color .2s,border-color .2s}
-.bar .loc .track::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--mute);transition:transform .25s cubic-bezier(.16,1,.3,1),background-color .2s}
-.bar .loc .sw:hover .track{border-color:var(--mute)}
-.bar .loc .sw input:checked+.track{background:rgba(255,176,32,.16);border-color:var(--amber)}
-.bar .loc .sw input:checked+.track::after{transform:translateX(20px);background:var(--amber)}
-.bar .loc .sw input:focus-visible+.track{outline:2px solid var(--amber);outline-offset:3px}
-.bar .loc .sw-t{display:flex;flex-direction:column;gap:2px}
-.bar .loc .sw-t b{display:flex;align-items:center;gap:7px;font-weight:600;font-size:14px;color:var(--ink)}
-.bar .loc .sw-t b i{color:var(--amber);font-size:17px}
-.bar .loc .sw-t small{font-size:12px;color:var(--mute);max-width:46ch;text-wrap:pretty}
-.bar .loc .rad{display:flex;align-items:center;gap:12px;min-height:44px}
-.bar .loc .rad label{color:var(--mute)}
-.bar .loc .rad input[type=range]{width:min(220px,40vw);height:44px}
-.bar .loc .rad output{min-width:6ch;color:var(--amber);font-variant-numeric:tabular-nums}
-.bar .loc .rad:has(input:disabled){opacity:.45}
-.bar .loc .loc-st{flex-basis:100%;font-size:12px;color:var(--mute);text-wrap:pretty}
-@media(prefers-reduced-motion:reduce){.bar .loc .track,.bar .loc .track::after{transition:none}}
-.chip.h{left:12px;top:48px;color:var(--mute);font-size:11px}
-.chip.r{left:auto;right:12px;top:auto;bottom:28px}
-.legend{position:absolute;z-index:5;left:12px;bottom:28px;padding:8px 12px;border-radius:10px;background:rgba(10,14,20,.88);font-size:11px;border:1px solid var(--line)}
-.legend i{display:inline-block;width:18px;height:0;border-top:2px solid;margin-right:6px;vertical-align:middle}
-.maplibregl-popup-content{background:#111824;color:var(--ink);font:12px 'JetBrains Mono',monospace;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.maplibregl-popup-tip{display:none}.maplibregl-popup-close-button{color:var(--ink)}
-.maplibregl-ctrl-attrib{font-size:10px}
-#quiz{margin-top:14px;padding:22px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
-#quiz .opts{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
-#quiz .opt{padding:10px 18px;border-radius:12px;border:1px solid var(--line);background:#0d1420;color:var(--ink);font:600 14px Sora;cursor:pointer}
-#quiz .opt:hover:not(:disabled){border-color:var(--amber)}
-#quiz .opt.ok{background:rgba(52,211,153,.15);border-color:var(--ok)}
-#quiz .opt.bad{background:rgba(248,113,113,.15);border-color:var(--bad)}
-#fb{color:var(--mute);font-size:14px;min-height:1.5em}
-.score{float:right;color:var(--amber)}
-footer{padding:40px 5vw;border-top:1px solid var(--line);color:var(--mute);font-size:13px}
-@media(max-width:820px){.split{grid-template-columns:1fr}.pane{height:50vh}nav div a:not(:last-child){display:none}.hero svg{opacity:.25}}
-@media(prefers-reduced-motion:reduce){.sweep{animation:none!important}.reveal{transition:none}}
-</style>
-</head>
-<body>
-<nav><b>CHART<span>ROOM</span></b><div><a href="#practice">Sectional Practice</a><a href="#topics">Topics</a><a href="#practice">Start</a></div></nav>
-
-<header class="hero">
-  <svg viewBox="0 0 400 400" aria-hidden="true"><circle cx="200" cy="200" r="60"/><circle cx="200" cy="200" r="120"/><circle cx="200" cy="200" r="180"/><line x1="200" y1="0" x2="200" y2="400" stroke="#1e2a3b"/><line x1="0" y1="200" x2="400" y2="200" stroke="#1e2a3b"/>
-  <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#ffb020" stop-opacity="0"/><stop offset="1" stop-color="#ffb020" stop-opacity=".5"/></linearGradient></defs>
-  <path class="sweep" d="M200 200 L200 20 A180 180 0 0 1 327 73 Z" fill="url(#g)"/></svg>
-  <div class="eyebrow mono">Private Pilot · United States · 14 CFR Part 61</div>
-  <h1>Read the chart. <em>See the sky.</em></h1>
-  <p class="lead">Stop memorizing airspace. Fly over a 3D sectional on one side while the real-world airspace tracks it on the other, then get quizzed on what's overhead.</p>
-  <div><a class="btn" href="#practice">Open Sectional Practice</a><a class="btn ghost" href="#topics">Browse topics</a></div>
-</header>
-
-<section id="practice">
-  <div class="eyebrow mono reveal">Flagship</div>
-  <h2 class="reveal">Sectional Practice</h2>
-  <p class="lead reveal">Left: FAA VFR Sectional on 3D terrain. Right: live FAA airspace, with the floor and ceiling of each area. Click either side for details.</p>
-  <div class="bar reveal">
-    <div class="loc" id="loc">
-      <label class="sw" for="useLoc">
-        <input type="checkbox" role="switch" id="useLoc" name="useLocation" autocomplete="off" aria-describedby="locHint">
-        <span class="track" aria-hidden="true"></span>
-        <span class="sw-t"><b><i class="ph ph-map-pin" aria-hidden="true"></i>Use my location</b><small id="locHint">Practice with airports near you. Your position stays in this browser.</small></span>
-      </label>
-      <div class="rad">
-        <label for="locRad">Search radius</label>
-        <input type="range" id="locRad" name="radius" min="25" max="300" step="25" value="150" disabled autocomplete="off" aria-describedby="locRadOut">
-        <output id="locRadOut" for="locRad" class="mono">150&nbsp;mi</output>
-      </div>
-      <div class="mono loc-st" id="locStat" role="status" aria-live="polite" hidden></div>
-    </div>
-    <label><input type="checkbox" id="link" checked autocomplete="off"> Link maps</label>
-    <label>Terrain <input type="range" id="exag" min="0" max="3" step=".1" value="1.5"></label>
-    <label>Tilt <input type="range" id="tilt" min="0" max="75" step="1" value="55"></label>
-    <label><input type="checkbox" id="lbl" checked> Airspace labels</label>
-    <label><input type="checkbox" id="linkang" checked> Link camera angle</label>
-    <label><input type="checkbox" id="a3d" checked> 3D airspace</label>
-    <label>Height × <input type="range" id="aex" min="1" max="12" step=".5" value="4"></label>
-    <label><input type="checkbox" class="cls" value="B" checked> B</label>
-    <label><input type="checkbox" class="cls" value="C" checked> C</label>
-    <label><input type="checkbox" class="cls" value="D" checked> D</label>
-    <label><input type="checkbox" class="cls" value="E" checked> E</label>
-    <button class="btn sm" id="newq">▶ Practice mode</button>
-  </div>
-  <div class="split">
-    <div class="pane"><div id="mapL"></div><div class="chip mono">VFR SECTIONAL · 3D</div></div>
-    <div class="pane"><div id="mapR"></div><div class="chip mono">LIVE AIRSPACE · 3D</div><div class="chip h mono">Drag: pan · Right-drag or Ctrl-drag: tilt &amp; rotate · Scroll: zoom</div><div class="chip r mono" id="status">Loading…</div>
-      <div class="legend mono"><div><i style="border-color:#3b82f6"></i>Class B</div><div><i style="border-color:#d946ef"></i>Class C</div><div><i style="border-color:#3b82f6;border-top-style:dashed"></i>Class D</div><div><i style="border-color:#d946ef;border-top-style:dashed"></i>Class E</div></div>
-    </div>
-  </div>
-  <div id="quiz">
-    <span class="score mono" id="score">0 / 0</span>
-    <div id="q"><b>Practice mode</b><br><span style="color:var(--mute)">Press “Practice mode” to drop a pin somewhere in the US. Use the sectional on the left to work out the airspace, then answer.</span></div>
-    <div class="opts" id="opts"></div>
-    <div id="fb"></div>
-  </div>
-</section>
-
-<section id="topics">
-  <div class="eyebrow mono reveal">Syllabus</div>
-  <h2 class="reveal">Private Pilot topics</h2>
-  <div class="grid">
-    <div class="card reveal"><span class="mono">01</span><h3>Airspace &amp; Charts</h3><p>Classes, floors and ceilings, sectional symbols.</p><span class="tag live">Live</span></div>
-    <div class="card reveal"><span class="mono">02</span><h3>Weather</h3><p>METAR/TAF, fronts, go/no-go.</p><span class="tag">Coming soon</span></div>
-    <div class="card reveal"><span class="mono">03</span><h3>Regulations</h3><p>Parts 61 and 91, currency, VFR minimums.</p><span class="tag">Coming soon</span></div>
-    <div class="card reveal"><span class="mono">04</span><h3>Aerodynamics</h3><p>Lift, stalls, performance.</p><span class="tag">Coming soon</span></div>
-    <div class="card reveal"><span class="mono">05</span><h3>Navigation</h3><p>Pilotage, dead reckoning, E6B, VOR.</p><span class="tag">Coming soon</span></div>
-    <div class="card reveal"><span class="mono">06</span><h3>Airport Ops &amp; Radio</h3><p>Towered and non-towered, phraseology.</p><span class="tag">Coming soon</span></div>
-    <div class="card reveal"><span class="mono">07</span><h3>Weight &amp; Balance</h3><p>Loading, CG, density altitude.</p><span class="tag">Coming soon</span></div>
-    <div class="card reveal"><span class="mono">08</span><h3>ADM &amp; Aeromedical</h3><p>Risk, IMSAFE, hypoxia.</p><span class="tag">Coming soon</span></div>
-  </div>
-</section>
-
-<footer>
-  <b>For study only. Not for navigation or flight planning.</b> Always use current official charts and sources.<br>
-  Chart tiles and airspace data: Federal Aviation Administration, Aeronautical Information Services (updated every 56 days; data may lag the current cycle). Terrain: AWS Terrain Tiles. Base map: OpenFreeMap, © OpenMapTiles, data © OpenStreetMap contributors.
-</footer>
-
-<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-<script src="https://unpkg.com/deck.gl@9.4.0/dist.min.js"></script>
-<script>
+/* Sectional Practice: two linked maps (FAA VFR sectional on 3D terrain, live airspace as 3D volumes) plus a quiz.
+   Needs maplibregl and deck from assets/vendor. Usage events go through window.CR.track and carry no location. */
 // ---------- config ----------
 const SECT='https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Sectional/MapServer/tile/{z}/{y}/{x}';
 const AIR='https://services6.arcgis.com/ssFJjBXIUyZDrSYZ/arcgis/rest/services/Class_Airspace/FeatureServer/0/query';
@@ -197,7 +19,7 @@ function enrich(f){
   const p=f.properties;
   p.floor=fmt(p.LOWER_VAL,p.LOWER_UOM,p.LOWER_CODE);
   p.ceil=fmt(p.UPPER_VAL,p.UPPER_UOM,p.UPPER_CODE);
-  p.label=`${p.NAME||p.CLASS}\n${p.floor} – ${p.ceil}`;
+  p.label=`${p.NAME||p.CLASS}\n${p.floor} to ${p.ceil}`;
   return f;
 }
 
@@ -209,6 +31,7 @@ const mapL=new maplibregl.Map({container:'mapL',...START,pitch:55,bearing:0,minZ
    layers:[{id:'bg',type:'background',paint:{'background-color':'#0a0e14'}},{id:'faa',type:'raster',source:'faa'}],
    terrain:{source:'dem',exaggeration:1.5}}});
 mapL.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-right');
+mapL.getCanvas().setAttribute('aria-label','Sectional chart map, 3D');
 
 const mapR=new maplibregl.Map({container:'mapR',...START,pitch:55,bearing:0,maxPitch:80,minZoom:6,maxZoom:15,attributionControl:{compact:true},
   style:{version:8,glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -225,6 +48,7 @@ const mapR=new maplibregl.Map({container:'mapR',...START,pitch:55,bearing:0,maxP
     {id:'b-runway',type:'line',source:'base','source-layer':'aeroway',minzoom:9,filter:['in',['get','class'],['literal',['runway','taxiway']]],paint:{'line-color':'#8a9bb3','line-width':['interpolate',['linear'],['zoom'],9,.6,15,7]}}
    ]}});
 mapR.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-right');
+mapR.getCanvas().setAttribute('aria-label','Airspace map, 3D');
 
 // ---------- 3D airspace volumes (deck.gl) ----------
 const FT=0.3048;
@@ -272,7 +96,7 @@ function applyMode(){
 }
 
 const colorExpr=['match',['get','CLASS'],'B',COL.B,'C',COL.C,'D',COL.D,'E',COL.E,'#94a3b8'];
-mapR.on('load',()=>{
+mapR.once('style.load',()=>{
   setTimeout(()=>applyMode(),0);
   mapR.addLayer({id:'air-fill',type:'fill',source:'air',paint:{'fill-color':colorExpr,'fill-opacity':['match',['get','CLASS'],'E',.06,.13]}});
   mapR.addLayer({id:'air-solid',type:'line',source:'air',filter:['in',['get','CLASS'],['literal',['B','C']]],paint:{'line-color':colorExpr,'line-width':2}});
@@ -399,6 +223,7 @@ async function enableLocation(){
       st.textContent='Finding airports near you…';
       const pool=await loadAirportsNear(lat,lon);
       if(!pool.length)return fail('No airports found near you. Using the built-in examples.');
+      window.CR?.track('location_enabled');
       LOCAL.pos={lat,lon};LOCAL.pool=pool;LOCAL.on=true;LOCAL.setRadius(+rad.value);rad.disabled=false;
       locStatus();showLocalOnMap();LOCAL._emit();
       const f=LOCAL.airports[0]||pool[0];mapL.jumpTo({center:[f.lon,f.lat],zoom:10.5});
@@ -410,7 +235,7 @@ $('locRad').oninput=e=>{const v=+e.target.value;$('locRadOut').innerHTML=v+'&nbs
 
 // ---------- practice mode ----------
 const SPOTS=[[47.449,-122.309],[47.907,-122.282],[47.268,-122.578],[45.589,-122.595],[39.856,-104.674],[40.788,-111.978],[30.194,-97.67],[42.364,-71.005],[33.943,-118.408],[41.978,-87.904],[33.64,-84.427],[25.793,-80.29],[36.08,-115.152],[44.88,-93.217],[39.049,-77.46]];
-const KEY={B:'Class B (solid blue) — surface to ~10,000 ft MSL around the nation’s busiest airports; needs an ATC clearance.',C:'Class C (solid magenta) — two-way radio contact required before entering.',D:'Class D (dashed blue) — towered airports; two-way radio contact required before entering.',E:'Class E (dashed magenta / shaded vignette) — controlled airspace; no clearance needed under VFR, but weather minimums apply.',G:'Class G — uncontrolled airspace; no charted boundary here.'};
+const KEY={B:'Class B (solid blue): surface to ~10,000 ft MSL around the nation’s busiest airports; needs an ATC clearance.',C:'Class C (solid magenta): two-way radio contact required before entering.',D:'Class D (dashed blue): towered airports; two-way radio contact required before entering.',E:'Class E (dashed magenta / shaded vignette): controlled airspace; no clearance needed under VFR, but weather minimums apply.',G:'Class G: uncontrolled airspace; no charted boundary here.'};
 const PRI={B:4,C:3,D:2,E:1};
 let quizActive=false,pin=null,mk=[],score=[0,0],cur=null,near=null;
 const shuffle=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
@@ -428,7 +253,7 @@ function clearReveal(){
   if(mapL.getSource('reveal'))mapL.removeSource('reveal');
   revealMk.forEach(m=>m.remove());revealMk=[];
 }
-const hundreds=ft=>ft==null?'–':Math.round(ft/100);
+const hundreds=ft=>ft==null?'n/a':Math.round(ft/100);
 // the chart prints limits in hundreds of feet MSL: ceiling on top, floor underneath ("SFC" = surface)
 function chartLimits(p){
   const hi=toFt(p.UPPER_VAL,p.UPPER_UOM,p.UPPER_CODE),lo=toFt(p.LOWER_VAL,p.LOWER_UOM,p.LOWER_CODE);
@@ -478,6 +303,7 @@ function next(){const n=document.createElement('button');n.className='btn sm';n.
 
 async function startQuiz(){
   clearReveal();
+  window.CR?.track('quiz_started',{local:!!(LOCAL.on&&LOCAL.airports.length)});
   mk.forEach(m=>m.remove());mk=[];
   near=null;
   if(LOCAL.on&&LOCAL.airports.length){
@@ -492,15 +318,16 @@ async function startQuiz(){
   $('link').checked=true;setQuizVis(true);mapR.getPopup?.();
   mapL.jumpTo({center:pin,zoom:10.5,pitch:50,bearing:0});
   mk=[mapL,mapR].map(m=>new maplibregl.Marker({color:'#ffb020'}).setLngLat(pin).addTo(m));
+  mk.forEach(x=>x.getElement().setAttribute('role','img'));
   $('q').innerHTML='Locating pin…';$('opts').innerHTML='';$('fb').textContent='';
   let fs;try{fs=await pointAir(pin[0],pin[1])}catch(e){$('q').innerHTML='Airspace feed unavailable right now. Try again.';setQuizVis(false);return}
   const top=fs.sort((a,b)=>(PRI[b.properties.CLASS]||0)-(PRI[a.properties.CLASS]||0))[0];
   const cls=top?top.properties.CLASS:'G';
   showQ('<b>Q1.</b> Use the sectional (left). What is the <u>highest-priority airspace class</u> at the amber pin?'+nearTxt(),['Class B','Class C','Class D','Class E','Class G'],(t,b)=>{
-    const ok=t==='Class '+cls;mark(ok,b,'Class '+cls);setQuizVis(false);
+    const ok=t==='Class '+cls;mark(ok,b,'Class '+cls);setQuizVis(false);window.CR?.track('quiz_answered',{question:1,correct:ok});
     const p=top?.properties;
     if(!ok)revealOnChart(top,cls,false);
-    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} It’s <b>Class ${cls}</b>${p?` — ${p.NAME||''}, floor ${p.floor}, ceiling ${p.ceil}`:''}.<br>${KEY[cls]}<br>${ok?'':'<i class="ph ph-map-pin" aria-hidden="true"></i> Look at the sectional (left): the correct airspace is outlined in amber.<br>'}`;
+    $('fb').innerHTML=`${ok?'<i class="ph ph-check-circle ok" aria-hidden="true"></i> Correct.':'<i class="ph ph-x-circle bad" aria-hidden="true"></i> Not quite.'} It’s <b>Class ${cls}</b>${p?`${p.NAME?' ('+p.NAME+')':''}, floor ${p.floor}, ceiling ${p.ceil}`:''}.<br>${KEY[cls]}<br>${ok?'':'<i class="ph ph-map-pin" aria-hidden="true"></i> Look at the sectional (left): the correct airspace is outlined in amber.<br>'}`;
     if(top&&p.ceil!=='n/a'){const n=document.createElement('button');n.className='btn sm';n.textContent='Q2: ceiling →';n.style.marginTop='10px';n.onclick=()=>q2(top);$('fb').appendChild(n)}else next();
   });
 }
@@ -512,17 +339,11 @@ function q2(feat){
   const pool=['2,500 ft MSL','3,000 ft MSL','4,000 ft MSL','4,100 ft MSL','6,000 ft MSL','7,000 ft MSL','10,000 ft MSL','14,500 ft MSL','18,000 ft MSL'].filter(x=>x!==p.ceil);
   const opts=shuffle([p.ceil,...shuffle(pool).slice(0,3)]);
   showQ(`<b>Q2.</b> What is the <u>ceiling</u> of that Class ${p.CLASS} airspace (${p.NAME||'at the pin'})?`,opts,(t,b)=>{
-    const ok=t===p.ceil;mark(ok,b,p.ceil);setQuizVis(false);
+    const ok=t===p.ceil;mark(ok,b,p.ceil);setQuizVis(false);window.CR?.track('quiz_answered',{question:2,correct:ok});
     if(!ok)revealOnChart(feat,p.CLASS,true);
-    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} Ceiling <b>${p.ceil}</b>, floor <b>${p.floor}</b>. On the sectional, look for the numbers in the boundary: the top is the upper value, the bottom is the lower (“SFC” means surface).<br>${ok?'':'<i class="ph ph-map-pin" aria-hidden="true"></i> The amber tag on the sectional (left) shows how the chart prints it, in hundreds of feet: ceiling over floor.<br>'}`;
+    $('fb').innerHTML=`${ok?'<i class="ph ph-check-circle ok" aria-hidden="true"></i> Correct.':'<i class="ph ph-x-circle bad" aria-hidden="true"></i> Not quite.'} Ceiling <b>${p.ceil}</b>, floor <b>${p.floor}</b>. On the sectional, look for the numbers in the boundary: the top is the upper value, the bottom is the lower (“SFC” means surface).<br>${ok?'':'<i class="ph ph-map-pin" aria-hidden="true"></i> The amber tag on the sectional (left) shows how the chart prints it, in hundreds of feet: ceiling over floor.<br>'}`;
     next();
   });
 }
 $('newq').onclick=startQuiz;
 
-// ---------- reveal on scroll ----------
-const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
-document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
-</script>
-</body>
-</html>

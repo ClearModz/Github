@@ -1,0 +1,51 @@
+<!--{"title":"Sectional Practice","description":"Read a 3D VFR sectional next to live FAA airspace, then practice with questions from airports near you.","section":"practice","head":"<link rel=\"stylesheet\" href=\"{{root}}assets/vendor/maplibre/maplibre-gl.css\">\n<link rel=\"stylesheet\" href=\"{{root}}assets/css/practice.css\">","scripts":"<script src=\"{{root}}assets/vendor/maplibre/maplibre-gl.js\"></script>\n<script src=\"{{root}}assets/vendor/deck/deck.gl.min.js\"></script>\n<script src=\"{{root}}assets/js/practice.js\"></script>"}-->
+<header class="page-head">
+  <div class="wrap">
+    <h1 class="reveal">Sectional Practice</h1>
+    <p class="lead reveal" style="--d:1">Left: the FAA VFR sectional on 3D terrain. Right: live airspace as transparent volumes, floor to ceiling. Click either side for details.</p>
+  </div>
+</header>
+
+<section id="practice" aria-label="Sectional Practice">
+<div class="wrap wide">
+  <div class="bar">
+    <div class="loc" id="loc">
+      <label class="sw" for="useLoc">
+        <input type="checkbox" role="switch" id="useLoc" name="useLocation" autocomplete="off" aria-describedby="locHint">
+        <span class="track" aria-hidden="true"></span>
+        <span class="sw-t"><b><i class="ph ph-map-pin" aria-hidden="true"></i>Use my location</b><small id="locHint">Practice with airports near you. Your position stays in this browser.</small></span>
+      </label>
+      <div class="rad">
+        <label for="locRad">Search radius</label>
+        <input type="range" id="locRad" name="radius" min="25" max="300" step="25" value="150" disabled autocomplete="off" aria-describedby="locRadOut">
+        <output id="locRadOut" for="locRad" class="mono">150&nbsp;mi</output>
+      </div>
+      <div class="mono loc-st" id="locStat" role="status" aria-live="polite" hidden></div>
+    </div>
+    <label><input type="checkbox" id="link" checked autocomplete="off"> Link maps</label>
+    <label>Terrain <input type="range" autocomplete="off" id="exag" min="0" max="3" step=".1" value="1.5"></label>
+    <label>Tilt <input type="range" autocomplete="off" id="tilt" min="0" max="75" step="1" value="55"></label>
+    <label><input type="checkbox" autocomplete="off" id="lbl" checked> Airspace labels</label>
+    <label><input type="checkbox" autocomplete="off" id="linkang" checked> Link camera angle</label>
+    <label><input type="checkbox" autocomplete="off" id="a3d" checked> 3D airspace</label>
+    <label>Height × <input type="range" autocomplete="off" id="aex" min="1" max="12" step=".5" value="4"></label>
+    <label><input type="checkbox" autocomplete="off" class="cls" value="B" checked> B</label>
+    <label><input type="checkbox" autocomplete="off" class="cls" value="C" checked> C</label>
+    <label><input type="checkbox" autocomplete="off" class="cls" value="D" checked> D</label>
+    <label><input type="checkbox" autocomplete="off" class="cls" value="E" checked> E</label>
+    <button class="btn sm" id="newq" type="button"><i class="ph ph-play" aria-hidden="true"></i> Practice mode</button>
+  </div>
+  <div class="split">
+    <div class="pane"><div id="mapL"></div><div class="chip mono">VFR SECTIONAL · 3D</div></div>
+    <div class="pane"><div id="mapR"></div><div class="chip mono">LIVE AIRSPACE · 3D</div><div class="chip h mono">Drag: pan · Right-drag or Ctrl-drag: tilt &amp; rotate · Scroll: zoom</div><div class="chip r mono" id="status">Loading…</div>
+      <div class="legend mono"><div><i style="border-color:#3b82f6"></i>Class B</div><div><i style="border-color:#d946ef"></i>Class C</div><div><i style="border-color:#3b82f6;border-top-style:dashed"></i>Class D</div><div><i style="border-color:#d946ef;border-top-style:dashed"></i>Class E</div></div>
+    </div>
+  </div>
+  <div id="quiz">
+    <span class="score mono" id="score">0 / 0</span>
+    <div id="q"><b>Practice mode</b><br><span style="color:var(--mute)">Press “Practice mode” to drop a pin somewhere in the US. Use the sectional on the left to work out the airspace, then answer.</span></div>
+    <div class="opts" id="opts"></div>
+    <div id="fb"></div>
+  </div>
+</div>
+</section>

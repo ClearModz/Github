@@ -1,0 +1,22 @@
+{
+  "name": "chartroom",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chartroom: a private pilot study site. Static pages, built with a tiny Node script.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build/build.mjs",
+    "check": "node build/check.mjs",
+    "serve": "node build/serve.mjs",
+    "dev": "node build/build.mjs && node build/serve.mjs",
+    "test": "node build/build.mjs && node build/check.mjs"
+  },
+  "devDependencies": {
+    "@fontsource/jetbrains-mono": "5.2.5",
+    "@fontsource/sora": "5.2.5",
+    "@phosphor-icons/web": "2.1.1",
+    "deck.gl": "9.4.0",
+    "maplibre-gl": "5.6.0"
+  }
+}

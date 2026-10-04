@@ -1,0 +1,24 @@
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav">
+  <nav class="nav-pill" aria-label="Main">
+    <a class="brand" href="{{root}}" translate="no">
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="14" fill="none" stroke="#2a3a52" stroke-width="2"/><circle cx="16" cy="16" r="7" fill="none" stroke="#2a3a52" stroke-width="2"/><path d="M16 16 L16 2 A14 14 0 0 1 28 9 Z" fill="#ffb020"/></svg>
+      <span>CHART<em>ROOM</em></span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="{{root}}practice/"{{cur:practice}}>Sectional Practice</a></li>
+      <li><a href="{{root}}#topics"{{cur:topics}}>Topics</a></li>
+      <li><a href="{{root}}legal/attributions/"{{cur:attributions}}>Data and credits</a></li>
+    </ul>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu"><span></span><span></span><span></span></button>
+  </nav>
+</header>
+<div class="menu" id="menu" data-open="false" role="dialog" aria-modal="true" aria-label="Menu" hidden>
+  <ul>
+    <li><a style="--i:0" href="{{root}}practice/"{{cur:practice}}>Sectional Practice</a></li>
+    <li><a style="--i:1" href="{{root}}#topics"{{cur:topics}}>Topics</a></li>
+    <li><a style="--i:2" href="{{root}}legal/attributions/"{{cur:attributions}}>Data and credits</a></li>
+    <li><a style="--i:3" href="{{root}}legal/disclaimer/"{{cur:disclaimer}}>Disclaimer</a></li>
+    <li><a style="--i:4" href="{{root}}legal/privacy/"{{cur:privacy}}>Privacy</a></li>
+  </ul>
+</div>
