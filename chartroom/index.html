@@ -49,6 +49,7 @@ h2{font-size:clamp(28px,4vw,48px);margin:0 0 .3em;letter-spacing:-.02em}
 .pane{position:relative;height:62vh;min-height:380px;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
 .pane>div:first-child{position:absolute;inset:0}
 .chip{position:absolute;z-index:5;left:12px;top:12px;padding:6px 12px;border-radius:99px;background:rgba(10,14,20,.85);font-size:12px;border:1px solid var(--line)}
+.chip.h{left:12px;top:48px;color:var(--mute);font-size:11px}
 .chip.r{left:auto;right:12px;top:auto;bottom:28px}
 .legend{position:absolute;z-index:5;left:12px;bottom:28px;padding:8px 12px;border-radius:10px;background:rgba(10,14,20,.88);font-size:11px;border:1px solid var(--line)}
 .legend i{display:inline-block;width:18px;height:0;border-top:2px solid;margin-right:6px;vertical-align:middle}
@@ -90,11 +91,18 @@ footer{padding:40px 5vw;border-top:1px solid var(--line);color:var(--mute);font-
     <label>Terrain <input type="range" id="exag" min="0" max="3" step=".1" value="1.5"></label>
     <label>Tilt <input type="range" id="tilt" min="0" max="75" step="1" value="55"></label>
     <label><input type="checkbox" id="lbl" checked> Airspace labels</label>
+    <label><input type="checkbox" id="linkang" checked> Link camera angle</label>
+    <label><input type="checkbox" id="a3d" checked> 3D airspace</label>
+    <label>Height × <input type="range" id="aex" min="1" max="12" step=".5" value="4"></label>
+    <label><input type="checkbox" class="cls" value="B" checked> B</label>
+    <label><input type="checkbox" class="cls" value="C" checked> C</label>
+    <label><input type="checkbox" class="cls" value="D" checked> D</label>
+    <label><input type="checkbox" class="cls" value="E" checked> E</label>
     <button class="btn sm" id="newq">▶ Practice mode</button>
   </div>
   <div class="split">
     <div class="pane"><div id="mapL"></div><div class="chip mono">VFR SECTIONAL · 3D</div></div>
-    <div class="pane"><div id="mapR"></div><div class="chip mono">LIVE AIRSPACE</div><div class="chip r mono" id="status">Loading…</div>
+    <div class="pane"><div id="mapR"></div><div class="chip mono">LIVE AIRSPACE · 3D</div><div class="chip h mono">Drag: pan · Right-drag or Ctrl-drag: tilt &amp; rotate · Scroll: zoom</div><div class="chip r mono" id="status">Loading…</div>
       <div class="legend mono"><div><i style="border-color:#3b82f6"></i>Class B</div><div><i style="border-color:#d946ef"></i>Class C</div><div><i style="border-color:#3b82f6;border-top-style:dashed"></i>Class D</div><div><i style="border-color:#d946ef;border-top-style:dashed"></i>Class E</div></div>
     </div>
   </div>
@@ -127,6 +135,7 @@ footer{padding:40px 5vw;border-top:1px solid var(--line);color:var(--mute);font-
 </footer>
 
 <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/deck.gl@9.4.0/dist.min.js"></script>
 <script>
 // ---------- config ----------
 const SECT='https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Sectional/MapServer/tile/{z}/{y}/{x}';
@@ -160,7 +169,7 @@ const mapL=new maplibregl.Map({container:'mapL',...START,pitch:55,bearing:0,minZ
    terrain:{source:'dem',exaggeration:1.5}}});
 mapL.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-right');
 
-const mapR=new maplibregl.Map({container:'mapR',...START,minZoom:6,maxZoom:15,attributionControl:{compact:true},
+const mapR=new maplibregl.Map({container:'mapR',...START,pitch:55,bearing:0,maxPitch:80,minZoom:6,maxZoom:15,attributionControl:{compact:true},
   style:{version:8,glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
    sources:{base:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © OpenMapTiles · Data © OpenStreetMap contributors · Airspace: FAA AIS'},
             air:{type:'geojson',data:{type:'FeatureCollection',features:[]}}},
@@ -174,10 +183,56 @@ const mapR=new maplibregl.Map({container:'mapR',...START,minZoom:6,maxZoom:15,at
     {id:'b-apron',type:'fill',source:'base','source-layer':'aeroway',minzoom:10,filter:['==',['geometry-type'],'Polygon'],paint:{'fill-color':'#1a2433'}},
     {id:'b-runway',type:'line',source:'base','source-layer':'aeroway',minzoom:9,filter:['in',['get','class'],['literal',['runway','taxiway']]],paint:{'line-color':'#8a9bb3','line-width':['interpolate',['linear'],['zoom'],9,.6,15,7]}}
    ]}});
-mapR.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
+mapR.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-right');
+
+// ---------- 3D airspace volumes (deck.gl) ----------
+const FT=0.3048;
+let airData=null,overlay=null;
+if(window.deck&&deck.MapboxOverlay){overlay=new deck.MapboxOverlay({interleaved:false,layers:[]});mapR.addControl(overlay)}
+else $('status').textContent='3D airspace library did not load (flat view only)';
+const RGB={B:[59,130,246],C:[217,70,239],D:[96,165,250],E:[217,70,239]};
+const ALPHA={B:46,C:46,D:38,E:20};
+const toFt=(v,uom,code)=>{if(String(code).toUpperCase()==='SFC'||v===0)return 0;if(v==null||v<=-9000)return null;return String(uom||'').toUpperCase()==='FL'?v*100:v};
+function volumes(){
+  const on=[...document.querySelectorAll('.cls')].filter(c=>c.checked).map(c=>c.value);
+  const out=[];
+  (airData?.features||[]).forEach(f=>{
+    const p=f.properties;if(!on.includes(p.CLASS))return;
+    const floor=toFt(p.LOWER_VAL,p.LOWER_UOM,p.LOWER_CODE)??0;
+    let ceil=toFt(p.UPPER_VAL,p.UPPER_UOM,p.UPPER_CODE);
+    if(ceil==null)ceil=18000;               // no charted ceiling: runs up to Class A (18,000 ft MSL)
+    if(ceil<=floor)ceil=floor+300;
+    const g=f.geometry;if(!g)return;
+    const polys=g.type==='Polygon'?[g.coordinates]:g.type==='MultiPolygon'?g.coordinates:[];
+    polys.forEach(rings=>out.push({rings,p,floor,ceil}));
+  });
+  return out;
+}
+function updateDeck(){
+  if(!overlay)return;
+  if(!$('a3d').checked||quizActive){overlay.setProps({layers:[]});return}
+  const ex=+$('aex').value;
+  overlay.setProps({layers:[new deck.PolygonLayer({
+    id:'vol',data:volumes(),pickable:true,extruded:true,wireframe:true,filled:true,material:false,
+    parameters:{depthWriteEnabled:false},
+    getPolygon:d=>d.rings.map(r=>r.map(c=>[c[0],c[1],d.floor*FT*ex])),
+    getElevation:d=>(d.ceil-d.floor)*FT*ex,
+    getFillColor:d=>[...(RGB[d.p.CLASS]||[148,163,184]),ALPHA[d.p.CLASS]||30],
+    getLineColor:d=>[...(RGB[d.p.CLASS]||[148,163,184]),210],
+    lineWidthMinPixels:1,
+    updateTriggers:{getPolygon:[ex],getElevation:[ex]}
+  })]});
+}
+// in 3D the flat shading under the volumes is hidden but still clickable; the ground outline stays as a shadow
+function applyMode(){
+  if(!mapR.getLayer('air-fill'))return;
+  mapR.setPaintProperty('air-fill','fill-opacity',$('a3d').checked?0:['match',['get','CLASS'],'E',.06,.13]);
+  updateDeck();
+}
 
 const colorExpr=['match',['get','CLASS'],'B',COL.B,'C',COL.C,'D',COL.D,'E',COL.E,'#94a3b8'];
 mapR.on('load',()=>{
+  setTimeout(()=>applyMode(),0);
   mapR.addLayer({id:'air-fill',type:'fill',source:'air',paint:{'fill-color':colorExpr,'fill-opacity':['match',['get','CLASS'],'E',.06,.13]}});
   mapR.addLayer({id:'air-solid',type:'line',source:'air',filter:['in',['get','CLASS'],['literal',['B','C']]],paint:{'line-color':colorExpr,'line-width':2}});
   mapR.addLayer({id:'air-dash',type:'line',source:'air',filter:['in',['get','CLASS'],['literal',['D','E']]],paint:{'line-color':colorExpr,'line-width':1.6,'line-dasharray':[3,2]}});
@@ -198,24 +253,31 @@ async function loadAir(){
     const r=await fetch(AIR+'?'+q,{signal:ctl.signal});const j=await r.json();
     if(!j.features) throw new Error('bad response');
     j.features.forEach(enrich);
-    mapR.getSource('air').setData(j);
+    mapR.getSource('air').setData(j);airData=j;updateDeck();
     $('status').textContent=j.features.length+' airspace areas'+(j.exceededTransferLimit?' (zoom in for more)':'');
   }catch(e){if(e.name!=='AbortError')$('status').textContent='Airspace feed unavailable'}
 }
 
 // ---------- link ----------
 let lock=false;
-function link(a,b){a.on('move',()=>{if(lock||!$('link').checked)return;lock=true;b.jumpTo({center:a.getCenter(),zoom:a.getZoom()});lock=false})}
+function link(a,b){a.on('move',()=>{if(lock||!$('link').checked)return;lock=true;const o={center:a.getCenter(),zoom:a.getZoom()};if($('linkang').checked){o.bearing=a.getBearing();o.pitch=a.getPitch()}b.jumpTo(o);lock=false})}
 link(mapL,mapR);link(mapR,mapL);
 $('link').onchange=()=>{if($('link').checked){lock=true;mapR.jumpTo({center:mapL.getCenter(),zoom:mapL.getZoom()});lock=false}};
 $('exag').oninput=e=>mapL.setTerrain({source:'dem',exaggeration:+e.target.value});
 $('tilt').oninput=e=>mapL.setPitch(+e.target.value);
 mapL.on('pitch',()=>{$('tilt').value=Math.round(mapL.getPitch())});
+$('a3d').onchange=applyMode;$('aex').oninput=updateDeck;document.querySelectorAll('.cls').forEach(c=>c.onchange=updateDeck);
 $('lbl').onchange=e=>{if(!quizActive)mapR.setLayoutProperty('air-lbl','visibility',e.target.checked?'visible':'none')};
 
 // ---------- click details ----------
 mapR.on('click',e=>{
   if(quizActive) return;
+  if(overlay&&$('a3d').checked){
+    const hit=overlay.pickObject({x:e.point.x,y:e.point.y,radius:4});
+    if(hit&&hit.object){const p=hit.object.p;
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b style="color:${COL[p.CLASS]||'#94a3b8'}">Class ${p.CLASS}</b> ${p.NAME||''}<br>Floor: ${p.floor}<br>Ceiling: ${p.ceil}<br><span style="color:#8a9bb3">Heights drawn ×${$('aex').value}</span>`).addTo(mapR);
+      return}
+  }
   const fs=mapR.queryRenderedFeatures(e.point,{layers:['air-fill']});
   if(!fs.length) return;
   const seen=new Set(),rows=[];
@@ -240,6 +302,7 @@ async function pointAir(lon,lat){
 function setQuizVis(on){
   quizActive=on;const v=on?'none':'visible';
   ['air-fill','air-solid','air-dash','air-lbl'].forEach(l=>mapR.getLayer(l)&&mapR.setLayoutProperty(l,'visibility',(l==='air-lbl'&&!$('lbl').checked&&!on)?'none':v));
+  updateDeck();
 }
 function showQ(text,opts,onPick){
   $('q').innerHTML=text;$('fb').innerHTML='';const o=$('opts');o.innerHTML='';
