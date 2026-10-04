@@ -58,6 +58,7 @@ for (const f of walk(path.join(DIST, 'assets')).filter(x => /\.(css|js)$/.test(x
   if (/[—–]/.test(s)) fail(f, 'contains an em or en dash');
   if (/window\.addEventListener\(['"]scroll/.test(s)) fail(f, 'scroll listener');
   if (/fonts\.googleapis|fonts\.gstatic|unpkg\.com|cdn\.jsdelivr/.test(s)) fail(f, 'external CDN reference');
+  if (f.endsWith('.js')) for (const m of s.matchAll(/\bph-([a-z0-9-]+)/g)) if (!known.has(m[1]) && !/^(ph|bold|fill|light|thin|duotone)$/.test(m[1])) fail(f, `unknown icon ph-${m[1]}`);
 }
 for (const f of htmlFiles) if (/fonts\.googleapis|unpkg\.com|cdn\.jsdelivr/.test(readFileSync(f, 'utf8'))) fail(f, 'external CDN reference');
 

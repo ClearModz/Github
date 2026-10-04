@@ -21,27 +21,6 @@
 .maplibregl-ctrl-attrib{font-size:10px}
 .maplibregl-ctrl-attrib a{text-decoration:underline;text-underline-offset:2px}
 
-/* location control */
-.bar .loc{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:12px 32px;padding:12px 16px;border:1px solid var(--hair);border-radius:16px;background:var(--bg-2)}
-.bar .loc label.sw{position:relative;display:flex;align-items:center;gap:14px;min-height:44px;cursor:pointer;color:var(--ink)}
-.bar .loc .sw input{position:absolute;left:0;top:50%;width:48px;height:44px;margin:-22px 0 0;opacity:0;cursor:pointer}
-.bar .loc .track{position:relative;flex:none;width:48px;height:28px;border-radius:999px;background:#18222f;border:1px solid var(--line);transition:background-color .3s var(--ease),border-color .3s var(--ease)}
-.bar .loc .track::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--mute);transition:transform .4s var(--ease),background-color .3s var(--ease)}
-.bar .loc .sw:hover .track{border-color:var(--mute)}
-.bar .loc .sw input:checked+.track{background:rgba(255,176,32,.16);border-color:var(--amber)}
-.bar .loc .sw input:checked+.track::after{transform:translateX(20px);background:var(--amber)}
-.bar .loc .sw input:focus-visible+.track{outline:2px solid var(--amber);outline-offset:3px}
-.bar .loc .sw-t{display:flex;flex-direction:column;gap:2px}
-.bar .loc .sw-t b{display:flex;align-items:center;gap:7px;font-weight:600;font-size:14px;color:var(--ink)}
-.bar .loc .sw-t b i{color:var(--amber);font-size:17px}
-.bar .loc .sw-t small{font-size:12px;color:var(--mute);max-width:46ch;text-wrap:pretty}
-.bar .loc .rad{display:flex;align-items:center;gap:12px;min-height:44px}
-.bar .loc .rad label{color:var(--mute)}
-.bar .loc .rad input[type=range]{width:min(220px,40vw);height:44px}
-.bar .loc .rad output{min-width:6ch;color:var(--amber);font-variant-numeric:tabular-nums}
-.bar .loc .rad:has(input:disabled){opacity:.45}
-.bar .loc .loc-st{flex-basis:100%;font-size:12px;color:var(--mute);text-wrap:pretty}
-
 /* quiz */
 #quiz{margin-top:14px;padding:clamp(18px,3vw,26px);border:1px solid var(--hair);border-radius:var(--r-inner);background:var(--panel)}
 #quiz .opts{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}

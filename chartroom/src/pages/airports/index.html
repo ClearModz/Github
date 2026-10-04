@@ -1,0 +1,38 @@
+<!--{"title":"Airports","description":"Search any US airport for runways, radio frequencies, airspace and live weather. Use your location to start from airports near you.","section":"airports","head":"<link rel=\"stylesheet\" href=\"{{root}}assets/vendor/maplibre/maplibre-gl.css\">\n<link rel=\"stylesheet\" href=\"{{root}}assets/css/airports.css\">","scripts":"<script src=\"{{root}}assets/vendor/maplibre/maplibre-gl.js\"></script>\n<script src=\"{{root}}assets/js/basemap.js\"></script>\n<script src=\"{{root}}assets/js/local.js\"></script>\n<script src=\"{{root}}assets/js/weather.js\"></script>\n<script src=\"{{root}}assets/js/faa.js\"></script>\n<script src=\"{{root}}assets/js/planstore.js\"></script>\n<script src=\"{{root}}assets/js/airports.js\"></script>"}-->
+<header class="page-head">
+  <div class="wrap">
+    <h1 class="reveal">Airports</h1>
+    <p class="lead reveal" style="--d:1">Runways, radio frequencies, airspace and live weather for every US airport in the list.</p>
+  </div>
+</header>
+
+<section class="ap" aria-label="Airport finder">
+  <div class="wrap wide">
+    <div id="loc-mount"></div>
+    <div class="ap-grid">
+      <div class="ap-side">
+        <form class="field" role="search" id="ap-form">
+          <label for="ap-q">Search airports</label>
+          <input id="ap-q" name="q" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Name, city or code, like KSEA…" aria-describedby="ap-help">
+          <small id="ap-help">Try a city, an airport name, or a code such as KBFI or SEA.</small>
+        </form>
+        <p class="mono ap-count" id="ap-count" role="status" aria-live="polite"></p>
+        <ul class="ap-list" id="ap-list"></ul>
+      </div>
+      <div class="ap-main">
+        <div class="ap-map-wrap">
+          <div id="ap-map" aria-label="Airport map"></div>
+          <ul class="ap-key mono" aria-label="Map colors">
+            <li><i style="--c:#34d399"></i>VFR</li>
+            <li><i style="--c:#60a5fa"></i>MVFR</li>
+            <li><i style="--c:#f87171"></i>IFR</li>
+            <li><i style="--c:#d946ef"></i>LIFR</li>
+            <li><i style="--c:#8a9bb3"></i>No report</li>
+          </ul>
+          <p class="mono ap-wx-note" id="ap-wx-note" role="status" aria-live="polite" hidden></p>
+        </div>
+        <article class="ap-detail" id="ap-detail" aria-live="polite" tabindex="-1"></article>
+      </div>
+    </div>
+  </div>
+</section>

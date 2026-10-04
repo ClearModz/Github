@@ -1,4 +1,4 @@
-<!--{"title":"Sectional Practice","description":"Read a 3D VFR sectional next to live FAA airspace, then practice with questions from airports near you.","section":"practice","head":"<link rel=\"stylesheet\" href=\"{{root}}assets/vendor/maplibre/maplibre-gl.css\">\n<link rel=\"stylesheet\" href=\"{{root}}assets/css/practice.css\">","scripts":"<script src=\"{{root}}assets/vendor/maplibre/maplibre-gl.js\"></script>\n<script src=\"{{root}}assets/vendor/deck/deck.gl.min.js\"></script>\n<script src=\"{{root}}assets/js/practice.js\"></script>"}-->
+<!--{"title":"Sectional Practice","description":"Read a 3D VFR sectional next to live FAA airspace, then practice with questions from airports near you.","section":"practice","head":"<link rel=\"stylesheet\" href=\"{{root}}assets/vendor/maplibre/maplibre-gl.css\">\n<link rel=\"stylesheet\" href=\"{{root}}assets/css/practice.css\">","scripts":"<script src=\"{{root}}assets/vendor/maplibre/maplibre-gl.js\"></script>\n<script src=\"{{root}}assets/vendor/deck/deck.gl.min.js\"></script>\n<script src=\"{{root}}assets/js/basemap.js\"></script>\n<script src=\"{{root}}assets/js/local.js\"></script>\n<script src=\"{{root}}assets/js/practice.js\"></script>"}-->
 <header class="page-head">
   <div class="wrap">
     <h1 class="reveal">Sectional Practice</h1>
@@ -9,19 +9,7 @@
 <section id="practice" aria-label="Sectional Practice">
 <div class="wrap wide">
   <div class="bar">
-    <div class="loc" id="loc">
-      <label class="sw" for="useLoc">
-        <input type="checkbox" role="switch" id="useLoc" name="useLocation" autocomplete="off" aria-describedby="locHint">
-        <span class="track" aria-hidden="true"></span>
-        <span class="sw-t"><b><i class="ph ph-map-pin" aria-hidden="true"></i>Use my location</b><small id="locHint">Practice with airports near you. Your position stays in this browser.</small></span>
-      </label>
-      <div class="rad">
-        <label for="locRad">Search radius</label>
-        <input type="range" id="locRad" name="radius" min="25" max="300" step="25" value="150" disabled autocomplete="off" aria-describedby="locRadOut">
-        <output id="locRadOut" for="locRad" class="mono">150&nbsp;mi</output>
-      </div>
-      <div class="mono loc-st" id="locStat" role="status" aria-live="polite" hidden></div>
-    </div>
+    <div id="loc-mount"></div>
     <label><input type="checkbox" id="link" checked autocomplete="off"> Link maps</label>
     <label>Terrain <input type="range" autocomplete="off" id="exag" min="0" max="3" step=".1" value="1.5"></label>
     <label>Tilt <input type="range" autocomplete="off" id="tilt" min="0" max="75" step="1" value="55"></label>

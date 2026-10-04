@@ -4,7 +4,10 @@
 const SECT='https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Sectional/MapServer/tile/{z}/{y}/{x}';
 const AIR='https://services6.arcgis.com/ssFJjBXIUyZDrSYZ/arcgis/rest/services/Class_Airspace/FeatureServer/0/query';
 const DEM='https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
-const START={center:[-122.31,47.45],zoom:9.5};
+const QS=new URLSearchParams(location.search);
+const START=(QS.has('lat')&&QS.has('lon')&&isFinite(+QS.get('lat'))&&isFinite(+QS.get('lon')))
+  ?{center:[+QS.get('lon'),+QS.get('lat')],zoom:Math.min(14,Math.max(6,+QS.get('z')||10.5))}
+  :{center:[-122.31,47.45],zoom:9.5};
 const COL={B:'#3b82f6',C:'#d946ef',D:'#3b82f6',E:'#d946ef'};
 const $=id=>document.getElementById(id);
 
@@ -34,19 +37,7 @@ mapL.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-rig
 mapL.getCanvas().setAttribute('aria-label','Sectional chart map, 3D');
 
 const mapR=new maplibregl.Map({container:'mapR',...START,pitch:55,bearing:0,maxPitch:80,minZoom:6,maxZoom:15,attributionControl:{compact:true},
-  style:{version:8,glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-   sources:{base:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © OpenMapTiles · Data © OpenStreetMap contributors · Airspace: FAA AIS'},
-            air:{type:'geojson',data:{type:'FeatureCollection',features:[]}}},
-   layers:[
-    {id:'bg',type:'background',paint:{'background-color':'#0d1420'}},
-    {id:'b-park',type:'fill',source:'base','source-layer':'park',paint:{'fill-color':'#0f1c1a'}},
-    {id:'b-water',type:'fill',source:'base','source-layer':'water',paint:{'fill-color':'#08111c'}},
-    {id:'b-bound',type:'line',source:'base','source-layer':'boundary',filter:['<=',['get','admin_level'],4],paint:{'line-color':'#2c3b52','line-width':1,'line-dasharray':[3,2]}},
-    {id:'b-road-minor',type:'line',source:'base','source-layer':'transportation',minzoom:11,filter:['in',['get','class'],['literal',['minor','service','tertiary']]],paint:{'line-color':'#182233','line-width':['interpolate',['linear'],['zoom'],11,.4,15,2]}},
-    {id:'b-road',type:'line',source:'base','source-layer':'transportation',minzoom:7,filter:['in',['get','class'],['literal',['motorway','trunk','primary','secondary']]],paint:{'line-color':'#2a3a52','line-width':['interpolate',['linear'],['zoom'],7,.5,15,3.5]}},
-    {id:'b-apron',type:'fill',source:'base','source-layer':'aeroway',minzoom:10,filter:['==',['geometry-type'],'Polygon'],paint:{'fill-color':'#1a2433'}},
-    {id:'b-runway',type:'line',source:'base','source-layer':'aeroway',minzoom:9,filter:['in',['get','class'],['literal',['runway','taxiway']]],paint:{'line-color':'#8a9bb3','line-width':['interpolate',['linear'],['zoom'],9,.6,15,7]}}
-   ]}});
+  style:BASEMAP.style({air:{type:'geojson',data:{type:'FeatureCollection',features:[]}}})});
 mapR.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-right');
 mapR.getCanvas().setAttribute('aria-label','Airspace map, 3D');
 
@@ -151,87 +142,28 @@ mapR.on('click',e=>{
   new maplibregl.Popup().setLngLat(e.lngLat).setHTML(rows.join('<hr style="border:0;border-top:1px solid #1e2a3b;margin:8px 0">')).addTo(mapR);
 });
 
-// ---------- local airports (shared: every learning tab should use LOCAL) ----------
-// LOCAL.on        true when the "Use my location" box is ticked and airports were found
-// LOCAL.airports  nearest airports [{ident,name,city,type,lat,lon,elev,nm,dir}] sorted by distance
-// LOCAL.pick()    a random nearby airport (bigger fields are favoured)
-// LOCAL.subscribe(fn)  fn(LOCAL) runs whenever the location is switched on, off or updated
-const LOCAL={on:false,pos:null,pool:[],radiusMi:150,airports:[],_subs:[],
-  setRadius(mi){this.radiusMi=mi;this.airports=this.pool.filter(a=>a.nm*1.15078<=mi)},
-  mi:nm=>nm*1.15078,
-  subscribe(fn){this._subs.push(fn)},_emit(){this._subs.forEach(f=>{try{f(this)}catch(e){console.error(e)}})},
-  rad:d=>d*Math.PI/180,
-  nm(la1,lo1,la2,lo2){const R=3440.065,p=this.rad,a=Math.sin(p(la2-la1)/2)**2+Math.cos(p(la1))*Math.cos(p(la2))*Math.sin(p(lo2-lo1)/2)**2;return 2*R*Math.asin(Math.sqrt(a))},
-  bearing(la1,lo1,la2,lo2){const p=this.rad,y=Math.sin(p(lo2-lo1))*Math.cos(p(la2)),x=Math.cos(p(la1))*Math.sin(p(la2))-Math.sin(p(la1))*Math.cos(p(la2))*Math.cos(p(lo2-lo1));return (Math.atan2(y,x)*180/Math.PI+360)%360},
-  compass(b){return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(b/22.5)%16]},
-  _last:null,
-  pick(){const pool=this.airports.length>1?this.airports.filter(a=>a.ident!==this._last):this.airports;const w=pool.map(a=>({a,w:a.type==='large_airport'?4:a.type==='medium_airport'?2.5:1}));let t=w.reduce((s,x)=>s+x.w,0)*Math.random();let pick=w[0].a;for(const x of w){t-=x.w;if(t<=0){pick=x.a;break}}this._last=pick.ident;return pick}
-};
-const APT_CSV='https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv';
-function csvLine(l){const o=[];let c='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(q){if(ch==='"'){if(l[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}else if(ch==='"')q=true;else if(ch===','){o.push(c);c=''}else c+=ch}o.push(c);return o}
-async function loadAirportsNear(lat,lon){
-  const key='chartroom.localApts3',k=lat.toFixed(1)+','+lon.toFixed(1),MAXMI=300,maxNm=MAXMI/1.15078,dLat=maxNm/60+.3,dLon=dLat/Math.max(.2,Math.cos(lat*Math.PI/180));
-  try{const c=JSON.parse(localStorage.getItem(key)||'null');if(c&&c.k===k&&Date.now()-c.t<30*864e5&&c.airports.length)return c.airports}catch(e){}
-  const txt=await (await fetch(APT_CSV)).text();
-  const lines=txt.split('\n');const h=csvLine(lines[0]);const ix=n=>h.indexOf(n);
-  const I={id:ix('ident'),type:ix('type'),name:ix('name'),lat:ix('latitude_deg'),lon:ix('longitude_deg'),el:ix('elevation_ft'),city:ix('municipality'),icao:ix('icao_code'),gps:ix('gps_code'),iata:ix('iata_code'),sched:ix('scheduled_service'),wiki:ix('wikipedia_link'),home:ix('home_link')};
-  const ok=new Set(['large_airport','medium_airport','small_airport']);
-  const all=[];
-  for(let i=1;i<lines.length;i++){
-    const l=lines[i];if(!l)continue;
-    const f=csvLine(l);if(!ok.has(f[I.type]))continue;
-    // thousands of tiny private strips are in the data: for small fields keep only ones that look public (ICAO or IATA code, airline service, a website or a Wikipedia page)
-    if(f[I.type]==='small_airport'&&!(f[I.icao]||f[I.iata]||f[I.sched]==='yes'||f[I.wiki]||f[I.home]||/^K[A-Z0-9]{3}$/.test(f[I.gps]||'')))continue;
-    const la=+f[I.lat],lo=+f[I.lon];if(Math.abs(la-lat)>dLat||Math.abs(lo-lon)>dLon)continue;   // cheap pre-filter before the real distance
-    const nm=LOCAL.nm(lat,lon,la,lo);
-    all.push({ident:f[I.icao]||f[I.gps]||f[I.id],name:f[I.name],city:f[I.city],type:f[I.type],lat:la,lon:lo,elev:Math.round(+f[I.el])||0,nm,dir:LOCAL.compass(LOCAL.bearing(lat,lon,la,lo))});
-  }
-  all.sort((a,b)=>a.nm-b.nm);
-  const out=all.filter(a=>a.nm<=maxNm).slice(0,400);
-  try{localStorage.setItem(key,JSON.stringify({k,t:Date.now(),airports:out}))}catch(e){}
-  return out;
-}
+// ---------- local airports (the shared LOCAL module lives in local.js) ----------
 function showLocalOnMap(){
   if(!mapR.getSource('local')){
     mapR.addSource('local',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
     mapR.addLayer({id:'local-dot',type:'circle',source:'local',paint:{'circle-radius':['match',['get','rank'],0,6,1,5,3.5],'circle-color':'#ffb020','circle-stroke-color':'#0a0e14','circle-stroke-width':2}});
     mapR.addLayer({id:'local-lbl',type:'symbol',source:'local',layout:{'text-field':['get','ident'],'text-font':['Open Sans Regular'],'text-size':12,'text-offset':[0,1.1],'text-anchor':'top','text-optional':true,'symbol-sort-key':['get','rank']},paint:{'text-color':'#ffb020','text-halo-color':'#0a0e14','text-halo-width':1.6}});
   }
-  mapR.getSource('local').setData({type:'FeatureCollection',features:LOCAL.on?LOCAL.airports.map(a=>({type:'Feature',properties:{ident:a.ident,rank:a.type==='large_airport'?0:a.type==='medium_airport'?1:2},geometry:{type:'Point',coordinates:[a.lon,a.lat]}})):[]});
+  mapR.getSource('local').setData({type:'FeatureCollection',features:LOCAL.on?LOCAL.airports.map(a=>({type:'Feature',properties:{ident:a.id,rank:a.type==='L'?0:a.type==='M'?1:2},geometry:{type:'Point',coordinates:[a.lon,a.lat]}})):[]});
 }
 function nearTxt(){
   if(!near)return '';
-  const a=near.a,away=Math.round(LOCAL.mi(a.nm));return `<br><span class="mono" style="color:var(--amber);font-size:13px"><i class="ph ph-map-pin" aria-hidden="true"></i> The pin is ${near.nm.toFixed(1)} NM ${near.dir} of ${a.name}${a.ident?' ('+a.ident+')':''}${a.city?', '+a.city:''}, field elevation ${a.elev.toLocaleString()} ft. That field is about ${away}&nbsp;mi from you. Find it on the chart.</span>`;
+  const a=near.a,away=Math.round(LOCAL.mi(a.nm));
+  return `<br><span class="mono" style="color:var(--amber);font-size:13px"><i class="ph ph-map-pin" aria-hidden="true"></i> The pin is ${near.nm.toFixed(1)} NM ${near.dir} of ${a.name}${a.id?' ('+a.id+')':''}${a.city?', '+a.city:''}, field elevation ${a.elev.toLocaleString('en-US')} ft. That field is about ${away}&nbsp;mi from you. Find it on the chart.</span>`;
 }
-const fmtMi=n=>n.toLocaleString('en-US');
-function locStatus(){
-  const st=$('locStat');st.hidden=false;
-  if(!LOCAL.on){st.textContent='Location is off. Using the built-in example airports.';return}
-  const n=LOCAL.airports.length;
-  if(!n){st.textContent=`No airports found within ${LOCAL.radiusMi}\u00a0mi. Increase the radius to get more examples.`;return}
-  const f=LOCAL.airports[0];
-  st.textContent=`${n} ${n===1?'airport':'airports'} within ${LOCAL.radiusMi}\u00a0mi. Nearest: ${f.name} (${f.ident}), ${fmtMi(Math.round(LOCAL.mi(f.nm)))}\u00a0mi ${f.dir}.`;
-}
-async function enableLocation(){
-  const box=$('useLoc'),st=$('locStat'),rad=$('locRad');st.hidden=false;
-  const fail=m=>{box.checked=false;LOCAL.on=false;LOCAL.airports=[];LOCAL.pool=[];rad.disabled=true;st.textContent=m;showLocalOnMap();LOCAL._emit()};
-  if(!navigator.geolocation)return fail('This browser cannot share a location. Using the built-in examples.');
-  st.textContent='Waiting for your browser to share your location…';
-  navigator.geolocation.getCurrentPosition(async pos=>{
-    try{
-      const lat=pos.coords.latitude,lon=pos.coords.longitude;
-      st.textContent='Finding airports near you…';
-      const pool=await loadAirportsNear(lat,lon);
-      if(!pool.length)return fail('No airports found near you. Using the built-in examples.');
-      window.CR?.track('location_enabled');
-      LOCAL.pos={lat,lon};LOCAL.pool=pool;LOCAL.on=true;LOCAL.setRadius(+rad.value);rad.disabled=false;
-      locStatus();showLocalOnMap();LOCAL._emit();
-      const f=LOCAL.airports[0]||pool[0];mapL.jumpTo({center:[f.lon,f.lat],zoom:10.5});
-    }catch(e){fail('Could not load the airport list. Check your connection and try again. Using the built-in examples.')}
-  },err=>fail(err.code===1?'Location permission was denied. Allow it in your browser (the lock icon by the address), then turn this on again.':'Could not get your location'+(location.protocol==='file:'?'. If you opened this file directly, serve the folder from localhost instead (python3 -m http.server).':'. Try again.')),{enableHighAccuracy:false,timeout:15000,maximumAge:600000});
-}
-$('useLoc').onchange=e=>{if(e.target.checked)enableLocation();else{LOCAL.on=false;LOCAL.airports=[];$('locRad').disabled=true;locStatus();showLocalOnMap();LOCAL._emit()}};
-$('locRad').oninput=e=>{const v=+e.target.value;$('locRadOut').innerHTML=v+'&nbsp;mi';e.target.setAttribute('aria-valuetext',v+' miles');if(LOCAL.on){LOCAL.setRadius(v);locStatus();showLocalOnMap();LOCAL._emit()}};
+let styleReady=false;
+mapR.once('style.load',()=>{styleReady=true;if(LOCAL.on)showLocalOnMap();});
+const drawLocal=()=>{if(styleReady)showLocalOnMap();};
+LOCAL.mountControl($('loc-mount'));
+LOCAL.subscribe((L,reason)=>{
+  drawLocal();
+  if(reason==='enabled'){window.CR?.track('location_enabled');if(L.airports[0])mapL.jumpTo({center:[L.airports[0].lon,L.airports[0].lat],zoom:10.5});}
+});
 
 // ---------- practice mode ----------
 const SPOTS=[[47.449,-122.309],[47.907,-122.282],[47.268,-122.578],[45.589,-122.595],[39.856,-104.674],[40.788,-111.978],[30.194,-97.67],[42.364,-71.005],[33.943,-118.408],[41.978,-87.904],[33.64,-84.427],[25.793,-80.29],[36.08,-115.152],[44.88,-93.217],[39.049,-77.46]];

@@ -26,6 +26,7 @@ mkdirSync(DIST, { recursive: true });
 
 /* ---- static assets and vendored libraries (no CDN calls at runtime) ---- */
 cpSync(path.join(SRC, 'assets'), path.join(DIST, 'assets'), { recursive: true });
+cpSync(path.join(SRC, 'data'), path.join(DIST, 'assets/data'), { recursive: true });   // airports and runways, refreshed with npm run data:update
 const copy = (from, to) => { mkdirSync(path.dirname(path.join(DIST, to)), { recursive: true }); cpSync(path.join(NM, from), path.join(DIST, to)); };
 for (const w of ['400', '600', '800']) copy(`@fontsource/sora/files/sora-latin-${w}-normal.woff2`, `assets/fonts/sora-latin-${w}-normal.woff2`);
 for (const w of ['400', '600']) copy(`@fontsource/jetbrains-mono/files/jetbrains-mono-latin-${w}-normal.woff2`, `assets/fonts/jetbrains-mono-latin-${w}-normal.woff2`);

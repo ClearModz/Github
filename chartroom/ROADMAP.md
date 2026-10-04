@@ -38,16 +38,30 @@ phase can ship on its own.
   preview image (`og:image`) and the bento cards.
 - Choose the final brand direction. The current mark is a simple radar glyph.
 
-## Phase 1: core aviation data
-- Airport search and detail pages: runways, frequencies, elevation, a chart link. Replace the 12 MB OurAirports download
-  with a trimmed, versioned US extract built into the site.
-- Live weather: METAR and TAF on airport pages and on the map. Test CORS from the browser first.
-- NOTAM and TFR display.
-- Use `LOCAL` for the default airports on every page.
+## Phase 1: core aviation data (built, live services unverified)
+| Item | Status | Notes |
+|---|---|---|
+| Airport search and detail pages | Done | `/airports/`. 4,622 US airports with runways, frequencies, elevation and a link to the sectional. Search by code, name or city. |
+| Trimmed, versioned airport data | Done | `src/data/airports.json` and `airport-details.json`, built by `npm run data:update` from OurAirports (public domain). The retrieved date is inside the file. It replaces the 12 MB download. |
+| METAR and TAF | Built, **not verified live** | `weather.js` parses raw reports and sets the FAA flight category. Parsing is unit tested. The request to aviationweather.gov was not tested from a browser with real network access, so confirm its raw format and CORS first thing. If it fails the page links to the official report. |
+| TFR display | Built, **not verified live** | `faa.js` reads the tfr.faa.gov list by state and falls back to a link. Same caveat as weather. |
+| NOTAMs | Link only | The FAA NOTAM API needs registration. Pages link to the official source. |
+| Airspace at an airport | Done | Uses the same FAA Class Airspace service as Sectional Practice. |
+| `LOCAL` for default airports | Done | Airports, Plan and Practice share `local.js`. |
 
-## Phase 2: planning tools
-Route planner (distance, heading, time), weight and balance, performance and density altitude, fuel and time, save and
-export plans. Each tool starts from a nearby airport when location is on.
+## Phase 2: planning tools (built)
+| Tool | Status | Notes |
+|---|---|---|
+| Route planner | Done | Up to two stops, wind triangle, true and magnetic heading, ground speed, time and fuel per leg, route map. |
+| Weight and balance | Done | Envelope chart with takeoff and landing points. Ships with an **illustrative example aircraft**, clearly labeled. Students enter their own handbook numbers, saved in the browser. |
+| Performance | Done | Pressure and density altitude, runway headwind and crosswind, crosswind limit flag, rule-of-thumb takeoff roll, one-click METAR fill. |
+| Fuel and time | Done | Endurance, range, 91.151 day and night reserves, margin for the route. |
+| Save and export | Done | Named plans in the browser, JSON download and open, print view, copy as text. |
+| Starts from nearby airports | Done | When location is on, Plan starts at the nearest airport and offers a suggested trip. |
+
+Tests: `npm test` runs 26 unit tests (weather parsing, flight categories, aviation math), the build and the site checks.
+Browser tests with mocked weather and FAA services passed for Airports, Plan and Sectional Practice, with no axe violations
+and no horizontal scroll at 390 px. Real-network behavior still needs a check on a normal connection.
 
 ## Phase 3: accounts and personalization
 Sign-up and login, saved routes, favorite airports, aircraft profiles, digital logbook. This is the first phase that

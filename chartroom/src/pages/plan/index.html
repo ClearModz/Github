@@ -1,0 +1,171 @@
+<!--{"title":"Plan a Flight","description":"Study flight planning: route distance, headings and time, weight and balance, density altitude and runway winds, and fuel. Start from airports near you.","section":"plan","head":"<link rel=\"stylesheet\" href=\"{{root}}assets/vendor/maplibre/maplibre-gl.css\">\n<link rel=\"stylesheet\" href=\"{{root}}assets/css/plan.css\">","scripts":"<script src=\"{{root}}assets/vendor/maplibre/maplibre-gl.js\"></script>\n<script src=\"{{root}}assets/js/basemap.js\"></script>\n<script src=\"{{root}}assets/js/local.js\"></script>\n<script src=\"{{root}}assets/js/weather.js\"></script>\n<script src=\"{{root}}assets/js/calc.js\"></script>\n<script src=\"{{root}}assets/js/planstore.js\"></script>\n<script src=\"{{root}}assets/js/plan.js\"></script>"}-->
+<header class="page-head">
+  <div class="wrap">
+    <h1 class="reveal">Plan a flight</h1>
+    <p class="lead reveal" style="--d:1">Practice the numbers a pilot works out before every flight. The tools share one plan, so the route feeds fuel and weight and balance.</p>
+  </div>
+</header>
+
+<section class="plan" aria-label="Planning tools">
+  <div class="wrap">
+    <p class="note"><strong>For study only.</strong> Results are practice answers, not flight planning. Always use your aircraft’s handbook, current charts and an official weather briefing.</p>
+    <div id="loc-mount"></div>
+
+    <div class="tabs" role="tablist" aria-label="Planning tools">
+      <button class="tab" role="tab" type="button" id="tab-route" aria-controls="panel-route" aria-selected="true">Route</button>
+      <button class="tab" role="tab" type="button" id="tab-wb" aria-controls="panel-wb" aria-selected="false" tabindex="-1">Weight and balance</button>
+      <button class="tab" role="tab" type="button" id="tab-perf" aria-controls="panel-perf" aria-selected="false" tabindex="-1">Performance</button>
+      <button class="tab" role="tab" type="button" id="tab-fuel" aria-controls="panel-fuel" aria-selected="false" tabindex="-1">Fuel and time</button>
+      <button class="tab" role="tab" type="button" id="tab-saved" aria-controls="panel-saved" aria-selected="false" tabindex="-1">Saved plans</button>
+    </div>
+
+    <datalist id="dl-airports"></datalist>
+
+    <!-- ROUTE -->
+    <div class="panel-tool" role="tabpanel" id="panel-route" aria-labelledby="tab-route" tabindex="0">
+      <div class="tool-grid">
+        <form class="form" id="route-form" autocomplete="off" novalidate>
+          <h2>Route</h2>
+          <p class="suggest" id="suggest" hidden></p>
+          <div class="f"><label for="r-from">From</label><input id="r-from" name="from" list="dl-airports" autocapitalize="characters" spellcheck="false" placeholder="Code or city, like KBFI…"><small id="r-from-n" class="ap-name"></small></div>
+          <div class="f"><label for="r-via1">Stop 1 (optional)</label><input id="r-via1" name="via1" list="dl-airports" autocapitalize="characters" spellcheck="false" placeholder="Code or city…"><small id="r-via1-n" class="ap-name"></small></div>
+          <div class="f"><label for="r-via2">Stop 2 (optional)</label><input id="r-via2" name="via2" list="dl-airports" autocapitalize="characters" spellcheck="false" placeholder="Code or city…"><small id="r-via2-n" class="ap-name"></small></div>
+          <div class="f"><label for="r-to">To</label><input id="r-to" name="to" list="dl-airports" autocapitalize="characters" spellcheck="false" placeholder="Code or city, like KPDX…"><small id="r-to-n" class="ap-name"></small></div>
+          <div class="row2">
+            <div class="f"><label for="r-tas">True airspeed (kt)</label><input id="r-tas" name="tas" type="number" inputmode="decimal" min="40" max="400" step="1"></div>
+            <div class="f"><label for="r-burn">Fuel burn (gal per hour)</label><input id="r-burn" name="burn" type="number" inputmode="decimal" min="1" max="100" step="0.1"></div>
+          </div>
+          <div class="row2">
+            <div class="f"><label for="r-wdir">Wind from (° true)</label><input id="r-wdir" name="wdir" type="number" inputmode="numeric" min="0" max="360" step="1"></div>
+            <div class="f"><label for="r-wspd">Wind speed (kt)</label><input id="r-wspd" name="wspd" type="number" inputmode="decimal" min="0" max="120" step="1"></div>
+          </div>
+          <div class="row2">
+            <div class="f"><label for="r-var">Magnetic variation (°)</label><input id="r-var" name="var" type="number" inputmode="decimal" min="0" max="40" step="0.5"></div>
+            <div class="f"><label for="r-vardir">Variation is</label><select id="r-vardir" name="vardir"><option value="E">East</option><option value="W">West</option></select></div>
+          </div>
+          <label class="check"><input type="checkbox" id="r-night" name="night"> Night flight (45 minute reserve)</label>
+          <small>Find variation on the isogonic lines of a sectional. East is least: magnetic = true minus east variation.</small>
+        </form>
+        <div class="out">
+          <div class="ap-map-wrap"><div id="r-map" aria-label="Route map"></div></div>
+          <div id="r-out" aria-live="polite"></div>
+          <div class="actions"><button class="btn sm" type="button" id="r-save">Save this plan</button><button class="btn sm ghost" type="button" id="r-print">Print</button><button class="btn sm ghost" type="button" id="r-copy">Copy as text</button><a class="btn sm ghost" id="r-sect" href="../practice/">Open on the sectional</a></div>
+          <p class="msg" id="r-saved-msg" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEIGHT AND BALANCE -->
+    <div class="panel-tool" role="tabpanel" id="panel-wb" aria-labelledby="tab-wb" tabindex="0" hidden>
+      <div class="tool-grid">
+        <form class="form" id="wb-form" autocomplete="off" novalidate>
+          <h2>Loading</h2>
+          <p class="note" id="wb-note"></p>
+          <div class="row2">
+            <div class="f"><label for="wb-front">Front seats (lb)</label><input id="wb-front" name="front" type="number" inputmode="decimal" min="0" step="1"></div>
+            <div class="f"><label for="wb-rear">Rear seats (lb)</label><input id="wb-rear" name="rear" type="number" inputmode="decimal" min="0" step="1"></div>
+          </div>
+          <div class="row2">
+            <div class="f"><label for="wb-bag">Baggage (lb)</label><input id="wb-bag" name="bag" type="number" inputmode="decimal" min="0" step="1"></div>
+            <div class="f"><label for="wb-fuel">Fuel at takeoff (gal)</label><input id="wb-fuel" name="fuel" type="number" inputmode="decimal" min="0" step="0.5"></div>
+          </div>
+          <details class="adv" id="ac-details">
+            <summary>Aircraft data</summary>
+            <div class="f"><label for="ac-name">Name</label><input id="ac-name" name="acname" type="text" maxlength="40"></div>
+            <div class="row2">
+              <div class="f"><label for="ac-ew">Empty weight (lb)</label><input id="ac-ew" type="number" inputmode="decimal" step="0.1"></div>
+              <div class="f"><label for="ac-ea">Empty arm (in)</label><input id="ac-ea" type="number" inputmode="decimal" step="0.01"></div>
+            </div>
+            <div class="row2">
+              <div class="f"><label for="ac-max">Max takeoff weight (lb)</label><input id="ac-max" type="number" inputmode="decimal" step="1"></div>
+              <div class="f"><label for="ac-bagmax">Baggage limit (lb)</label><input id="ac-bagmax" type="number" inputmode="decimal" step="1"></div>
+            </div>
+            <div class="row3">
+              <div class="f"><label for="ac-fa">Front arm (in)</label><input id="ac-fa" type="number" inputmode="decimal" step="0.01"></div>
+              <div class="f"><label for="ac-ra">Rear arm (in)</label><input id="ac-ra" type="number" inputmode="decimal" step="0.01"></div>
+              <div class="f"><label for="ac-ba">Baggage arm (in)</label><input id="ac-ba" type="number" inputmode="decimal" step="0.01"></div>
+            </div>
+            <div class="row3">
+              <div class="f"><label for="ac-fla">Fuel arm (in)</label><input id="ac-fla" type="number" inputmode="decimal" step="0.01"></div>
+              <div class="f"><label for="ac-flcap">Usable fuel (gal)</label><input id="ac-flcap" type="number" inputmode="decimal" step="0.1"></div>
+              <div class="f"><label for="ac-flw">Fuel weight (lb per gal)</label><input id="ac-flw" type="number" inputmode="decimal" step="0.1"></div>
+            </div>
+            <div class="f"><label for="ac-env">CG envelope: one "arm, weight" pair per line, in order around the shape</label><textarea id="ac-env" rows="6" spellcheck="false"></textarea></div>
+            <div class="actions"><button class="btn sm ghost" type="button" id="ac-reset">Reset to the example aircraft</button></div>
+          </details>
+        </form>
+        <div class="out">
+          <div id="wb-out" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERFORMANCE -->
+    <div class="panel-tool" role="tabpanel" id="panel-perf" aria-labelledby="tab-perf" tabindex="0" hidden>
+      <div class="tool-grid">
+        <form class="form" id="perf-form" autocomplete="off" novalidate>
+          <h2>Conditions</h2>
+          <div class="f"><label for="p-apt">Airport</label><input id="p-apt" name="apt" list="dl-airports" autocapitalize="characters" spellcheck="false" placeholder="Code or city, like KDEN…"><small id="p-apt-n" class="ap-name"></small></div>
+          <div class="row2">
+            <div class="f"><label for="p-elev">Field elevation (ft)</label><input id="p-elev" name="elev" type="number" inputmode="numeric" step="1"></div>
+            <div class="f"><label for="p-temp">Temperature (°C)</label><input id="p-temp" name="temp" type="number" inputmode="decimal" step="1"></div>
+          </div>
+          <div class="row2">
+            <div class="f"><label for="p-altim">Altimeter (inHg)</label><input id="p-altim" name="altim" type="number" inputmode="decimal" min="27" max="32" step="0.01"></div>
+            <div class="f"><label for="p-xl">Crosswind limit (kt)</label><input id="p-xl" name="xl" type="number" inputmode="decimal" min="0" max="40" step="1"></div>
+          </div>
+          <div class="row2">
+            <div class="f"><label for="p-wdir">Wind from (° true)</label><input id="p-wdir" name="wdir" type="number" inputmode="numeric" min="0" max="360" step="1"></div>
+            <div class="f"><label for="p-wspd">Wind speed (kt)</label><input id="p-wspd" name="wspd" type="number" inputmode="decimal" min="0" max="120" step="1"></div>
+          </div>
+          <div class="row2">
+            <div class="f"><label for="p-var">Magnetic variation (°)</label><input id="p-var" name="var" type="number" inputmode="decimal" min="0" max="40" step="0.5"></div>
+            <div class="f"><label for="p-vardir">Variation is</label><select id="p-vardir" name="vardir"><option value="E">East</option><option value="W">West</option></select></div>
+          </div>
+          <div class="f"><label for="p-roll">Handbook takeoff roll, sea level and standard day (ft)</label><input id="p-roll" name="roll" type="number" inputmode="decimal" min="0" step="10"></div>
+          <div class="actions"><button class="btn sm" type="button" id="p-metar">Use the latest METAR for this airport</button></div>
+          <p class="msg" id="p-msg" role="status" aria-live="polite"></p>
+        </form>
+        <div class="out"><div id="perf-out" aria-live="polite"></div></div>
+      </div>
+    </div>
+
+    <!-- FUEL AND TIME -->
+    <div class="panel-tool" role="tabpanel" id="panel-fuel" aria-labelledby="tab-fuel" tabindex="0" hidden>
+      <div class="tool-grid">
+        <form class="form" id="fuel-form" autocomplete="off" novalidate>
+          <h2>Fuel</h2>
+          <div class="row2">
+            <div class="f"><label for="f-fob">Fuel on board (gal)</label><input id="f-fob" name="fob" type="number" inputmode="decimal" min="0" step="0.5"></div>
+            <div class="f"><label for="f-burn">Fuel burn (gal per hour)</label><input id="f-burn" name="burn" type="number" inputmode="decimal" min="1" max="100" step="0.1"></div>
+          </div>
+          <div class="row2">
+            <div class="f"><label for="f-gs">Ground speed (kt)</label><input id="f-gs" name="gs" type="number" inputmode="decimal" min="20" max="500" step="1"></div>
+            <div class="f"><label for="f-taxi">Taxi and run-up (gal)</label><input id="f-taxi" name="taxi" type="number" inputmode="decimal" min="0" step="0.5"></div>
+          </div>
+          <label class="check"><input type="checkbox" id="f-night" name="night"> Night flight (45 minute reserve)</label>
+          <small>Ground speed and the trip time come from the Route tab when a route is set. Change them here to try other numbers.</small>
+          <div class="actions"><button class="btn sm ghost" type="button" id="f-from-route">Use ground speed from the route</button></div>
+        </form>
+        <div class="out"><div id="fuel-out" aria-live="polite"></div></div>
+      </div>
+    </div>
+
+    <!-- SAVED -->
+    <div class="panel-tool" role="tabpanel" id="panel-saved" aria-labelledby="tab-saved" tabindex="0" hidden>
+      <div class="tool-grid">
+        <div class="form">
+          <h2>Save and share</h2>
+          <div class="f"><label for="s-name">Plan name</label><input id="s-name" name="name" type="text" maxlength="60" autocomplete="off" placeholder="Example: Practice trip to Portland…"></div>
+          <div class="actions"><button class="btn sm" type="button" id="s-save">Save current plan</button><button class="btn sm ghost" type="button" id="s-export">Download as a file</button></div>
+          <div class="f" style="margin-top:18px"><label for="s-import">Open a plan file</label><input id="s-import" name="import" type="file" accept="application/json,.json"></div>
+          <p class="msg" id="s-msg" role="status" aria-live="polite"></p>
+          <p class="muted">Plans are stored in this browser only. The privacy page can clear them.</p>
+        </div>
+        <div class="out"><div id="s-list"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="print-summary" aria-hidden="true"></div>

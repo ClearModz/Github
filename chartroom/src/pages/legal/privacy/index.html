@@ -14,9 +14,9 @@
     {{error_note}}
 
     <h2>Your location</h2>
-    <p>Location is <strong>off</strong> until you turn on <strong>Use my location</strong> in Sectional Practice. Your browser then asks for permission, and you can refuse.</p>
+    <p>Location is <strong>off</strong> until you turn on <strong>Use my location</strong> on any page with the switch (Sectional Practice, Airports, Plan). Your browser then asks for permission, and you can refuse.</p>
     <p>If you allow it, the page works out which airports are near you inside your browser. Your coordinates are not sent to Chartroom or to any service it uses.</p>
-    <p>To avoid downloading the airport list again, the page saves two things in your browser’s local storage for up to 30 days: your position rounded to a tenth of a degree (roughly 7 miles), and the list of nearby airports, which is public data. This button deletes both and anything else Chartroom saved.</p>
+    <p>To avoid downloading the airport list again, the page keeps your position rounded to a tenth of a degree (roughly 7 miles) in your browser. Plans you save and aircraft data you enter are also kept in your browser only. This button deletes all of it.</p>
     <p><button class="btn sm" id="clear-local" type="button">Clear saved location data</button> <span id="clear-status" role="status" aria-live="polite" class="mono" style="margin-left:10px;font-size:13px;color:var(--mute)"></span></p>
 
     <h2>Services your browser contacts</h2>
@@ -26,7 +26,9 @@
       <li><strong>Amazon Web Services</strong> supplies terrain tiles. Requests include tile numbers.</li>
       <li><strong>OpenFreeMap</strong> supplies the base map under the airspace. Requests include tile numbers.</li>
       <li><strong>MapLibre demo servers</strong> supply the lettering for airspace labels. Requests do not include a map position.</li>
-      <li><strong>GitHub</strong> serves the public OurAirports list, only when you turn on location. Everyone downloads the same file, so the request does not reveal where you are.</li>
+      <li><strong>aviationweather.gov</strong> (NOAA Aviation Weather Center) supplies METAR and TAF reports. Requests include the airport codes you are viewing, not your position.</li>
+      <li><strong>tfr.faa.gov</strong> supplies the list of temporary flight restrictions. The request is the same for everyone.</li>
+      <li>The airport list is built into this site. It is not downloaded from anywhere else.</li>
     </ul>
 
     <h2>Your choices</h2>

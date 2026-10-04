@@ -4,13 +4,16 @@
   "private": true,
   "type": "module",
   "description": "Chartroom: a private pilot study site. Static pages, built with a tiny Node script.",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "node build/build.mjs",
     "check": "node build/check.mjs",
     "serve": "node build/serve.mjs",
     "dev": "node build/build.mjs && node build/serve.mjs",
-    "test": "node build/build.mjs && node build/check.mjs"
+    "test": "node build/test-units.mjs && node build/build.mjs && node build/check.mjs",
+    "data:update": "node build/update-data.mjs"
   },
   "devDependencies": {
     "@fontsource/jetbrains-mono": "5.2.5",

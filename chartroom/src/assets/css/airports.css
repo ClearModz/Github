@@ -1,0 +1,81 @@
+/* Airports page. Shared tokens and components live in site.css. */
+.page-head{padding-bottom:0}
+.ap{padding:clamp(28px,5vw,56px) 0 0}
+.ap .wide{width:min(1560px,100% - 2*var(--pad-x))}
+#loc-mount{margin-bottom:18px}
+.ap-grid{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:960px){.ap-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* search + list */
+.field{display:grid;gap:8px}
+.field label{font-size:13px;color:var(--mute)}
+.field input{width:100%;min-height:48px;padding:0 18px;border-radius:999px;border:1px solid var(--hair);background:var(--panel);color:var(--ink);font:400 16px "Sora",sans-serif}
+.field input::placeholder{color:#6f8099}
+.field input:hover{border-color:rgba(255,255,255,.22)}
+.field small{font-size:12px;color:var(--mute)}
+.ap-count{margin:14px 2px 8px;font-size:12px;color:var(--mute)}
+.ap-list{list-style:none;margin:0;padding:6px;border-radius:var(--r-inner);border:1px solid var(--hair);background:var(--panel);max-height:min(62vh,640px);overflow:auto;overscroll-behavior:contain;display:grid;gap:2px;align-content:start}
+.ap-list:empty{display:none}
+.ap-list a{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:12px 14px;border-radius:16px;text-decoration:none;color:inherit;transition:background-color .3s var(--ease)}
+.ap-list a:hover{background:rgba(255,255,255,.05)}
+.ap-list a[aria-current=true]{background:rgba(255,176,32,.12)}
+.ap-list b{font-weight:600;font-size:15px;line-height:1.3}
+.ap-list small{display:block;color:var(--mute);font-size:12.5px}
+.ap-list .dist{grid-row:1/3;grid-column:2;align-self:center;text-align:right;font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums;display:grid;gap:4px;justify-items:end}
+
+/* flight category chips: the word is always shown, color only reinforces it */
+.cat{display:inline-block;padding:2px 9px;border-radius:999px;font:600 11px "JetBrains Mono",monospace;letter-spacing:.06em;border:1px solid currentColor}
+.cat-VFR{color:#34d399}.cat-MVFR{color:#60a5fa}.cat-IFR{color:#f87171}.cat-LIFR{color:#e879f9}
+
+/* map */
+.ap-map-wrap{position:relative;border-radius:var(--r-inner);overflow:hidden;border:1px solid var(--hair);background:var(--bg-2)}
+#ap-map{height:min(46vh,440px);min-height:300px}
+.ap-key{position:absolute;z-index:5;left:10px;bottom:28px;margin:0;padding:8px 12px;list-style:none;border-radius:12px;background:rgba(10,14,20,.88);border:1px solid var(--hair);font-size:11px;display:grid;gap:3px}
+.ap-key i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:var(--c)}
+.ap-wx-note{position:absolute;z-index:5;right:56px;top:10px;margin:0;padding:6px 12px;border-radius:999px;background:rgba(10,14,20,.88);border:1px solid var(--hair);font-size:11px;color:var(--mute);max-width:calc(100% - 70px)}
+.ap-wx-note a{color:var(--amber)}
+
+/* detail */
+.ap-detail{margin-top:18px;display:grid;gap:14px}
+.ap-detail:focus{outline:none}
+.ap-detail:focus-visible{outline:2px solid var(--amber);outline-offset:4px}
+.card-sec{padding:clamp(18px,2.4vw,26px);border-radius:var(--r-inner);border:1px solid var(--hair);background:var(--panel)}
+.card-sec h2{font-size:clamp(18px,2vw,22px);margin-bottom:14px;letter-spacing:-.015em}
+.ap-title{display:grid;gap:10px}
+.ap-title h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;margin:0}
+.ap-meta{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--mute);font-size:14px}
+.ap-meta b{color:var(--ink);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip-s{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--hair);font-size:12px;color:var(--mute)}
+.chip-s i{color:var(--amber)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.links{display:flex;flex-wrap:wrap;gap:6px 20px;margin:12px 0 0;padding:0;list-style:none;font-size:14px}
+.links a{color:var(--amber);text-underline-offset:3px}
+.links a:hover{color:var(--ink)}
+.dl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px 24px;margin:0}
+.dl-grid dt{font-size:12px;color:var(--mute);letter-spacing:.04em}
+.dl-grid dd{margin:2px 0 0;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.dl-grid dd small{display:block;font-size:12.5px;font-weight:400;color:var(--mute)}
+.raw{margin:16px 0 0;padding:12px 14px;border-radius:14px;background:var(--bg-2);color:#b7c4d6;font-size:12.5px;line-height:1.6;overflow-wrap:anywhere}
+.wx-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:14px}
+.wx-head h2{margin:0}
+.muted{color:var(--mute);font-size:13px}
+.hint-line{margin-top:14px;padding:12px 16px;border-radius:14px;background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.25);font-size:14px}
+.taf{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:10px}
+.taf li{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:baseline;font-size:13.5px}
+.taf .mono{font-size:12.5px;color:#b7c4d6;overflow-wrap:anywhere}
+.taf small{display:block;color:var(--mute);font-size:12px}
+.tbl-wrap{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:14px;min-width:420px}
+table.t th{font-size:12px;font-weight:600;color:var(--mute);text-align:left;padding:0 14px 10px 0;letter-spacing:.04em}
+table.t td{padding:9px 14px 9px 0;vertical-align:top;font-variant-numeric:tabular-nums}
+table.t td:first-child{font-weight:600}
+table.t .num{text-align:right}
+.msg{color:var(--mute);font-size:14px}
+.msg a{color:var(--amber);text-underline-offset:3px}
+.skel{height:14px;border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.11),rgba(255,255,255,.05));background-size:200% 100%;animation:sh 1.4s var(--ease) infinite}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+.maplibregl-ctrl-attrib{font-size:10px}
+.maplibregl-ctrl-attrib a{text-decoration:underline;text-underline-offset:2px}
+.ap-grid>*,.ap-detail,.ap-detail>*{min-width:0}

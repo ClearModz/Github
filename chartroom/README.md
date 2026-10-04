@@ -15,7 +15,7 @@ npm test         # build and run the checks (links, accessibility basics, punctu
 | `src/pages/**/index.html` | One file per page. A JSON comment on line 1 sets title, description and nav highlight. |
 | `src/partials/` | Shared head, nav and footer. |
 | `src/assets/css/site.css` | Design tokens and shared components. `home.css` and `practice.css` are page styles. |
-| `src/assets/js/` | `shell.js` (menu, reveals), `telemetry.js` (errors, analytics), `practice.js` (the sectional feature). |
+| `src/assets/js/` | `shell.js` (menu, reveals), `telemetry.js` (errors, analytics), `practice.js` (the sectional feature), `local.js` (airport data and the shared location switch), `weather.js`, `calc.js` (aviation math, unit tested), `faa.js`, `airports.js` and `plan.js`. |
 | `src/site.config.json` | Site URL, base path, analytics provider and error endpoint. |
 | `build/` | `build.mjs` (writes `dist/`), `check.mjs`, `serve.mjs`. |
 
@@ -34,3 +34,6 @@ Set them in `src/site.config.json`, then rebuild. The privacy page rewrites itse
 `.github/workflows/chartroom-pages.yml` publishes to GitHub Pages on pushes to `main`. One-time repository setting:
 Settings, Pages, Source: GitHub Actions. For a custom domain, set `siteUrl` and `basePath: "/"` in the config.
 Any static host works: run `npm test` and publish `dist/`.
+
+## Airport data
+`npm run data:update` rebuilds `src/data/airports.json` and `airport-details.json` from OurAirports (public domain). Commit the result. The files carry a retrieved date. Run `npm test` after.
