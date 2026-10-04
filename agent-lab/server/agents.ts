@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { AGENT_FILE, type AgentKey } from './types.js';
+import { routeFor } from './settings.js';
 
 export const AGENTS_DIR = process.env.AGENT_LAB_AGENTS_DIR ?? path.join(homedir(), '.claude', 'agents');
 export const WORK_DIR = path.resolve(process.env.AGENT_LAB_WORK_DIR ?? path.join(import.meta.dirname, '..', 'data', 'work'));
@@ -87,6 +88,7 @@ export async function runAgent(key: AgentKey, prompt: string, jobId: number, hoo
   if (!ALLOW_BASH) tools = tools.filter(t => t !== 'Bash');
   const cwd = path.join(WORK_DIR, `job-${jobId}`);
   mkdirSync(cwd, { recursive: true });
+  const route = routeFor(key);
   const useSkills = SKILLS_ON && SKILL_AGENTS.includes(key) && linkSkills(cwd).length > 0;
   const declared = new Set(tools);
   // Skills may need to read their own files and (web-design-guidelines) fetch rules from a pinned host.
@@ -111,7 +113,8 @@ export async function runAgent(key: AgentKey, prompt: string, jobId: number, hoo
         persistSession: false,
         includePartialMessages: true,
         maxTurns: Number(process.env.AGENT_LAB_MAX_TURNS ?? 25),
-        model: def.model ?? process.env.AGENT_LAB_MODEL,
+        model: route.model ?? def.model ?? process.env.AGENT_LAB_MODEL,
+        ...(route.env ? { env: route.isolated ? route.env : ({ ...process.env, ...route.env } as Record<string, string>) } : {}),
         abortController: ac,
         stderr: (d: string) => { stderrTail = (stderrTail + d).slice(-600); },
         permissionMode: 'default',
@@ -180,12 +183,13 @@ export async function writeAgentPrompt(key: AgentKey, prompt: string): Promise<v
 }
 
 /** One tiny, tool-less request to confirm Claude Code can actually reach the API from this machine. */
-export async function preflight(): Promise<string> {
+export async function preflight(agent: AgentKey = 'coord'): Promise<string> {
+  const route = routeFor(agent);
   const cwd = path.join(WORK_DIR, 'preflight');
   mkdirSync(cwd, { recursive: true });
   let stderrTail = '';
   try {
-    const q = query({ prompt: 'Reply with the single word OK.', options: { tools: [], cwd, settingSources: [], persistSession: false, maxTurns: 1, model: process.env.AGENT_LAB_MODEL, stderr: (d: string) => { stderrTail = (stderrTail + d).slice(-400); } } });
+    const q = query({ prompt: 'Reply with the single word OK.', options: { tools: [], cwd, settingSources: [], persistSession: false, maxTurns: 1, model: route.model ?? process.env.AGENT_LAB_MODEL, ...(route.env ? { env: route.isolated ? route.env : ({ ...process.env, ...route.env } as Record<string, string>) } : {}), stderr: (d: string) => { stderrTail = (stderrTail + d).slice(-400); } } });
     for await (const m of q) {
       if (m.type === 'result') {
         if (m.subtype === 'success' && !m.is_error) return 'ok';

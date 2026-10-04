@@ -283,9 +283,21 @@ button.danger.hot,button.danger:hover{background:var(--bad);color:#fff}
         <div class="row" id="liveBtns" hidden><button class="sm" id="pauseAll">Pause all</button><button class="sm" id="resumeAll">Resume all</button></div>
         <div id="agentLive"></div>
       </div>
+      <div class="panel" id="routePanel" hidden>
+        <h2>Model routing</h2>
+        <p class="hint">Run the agents through <b>OmniRoute</b> (free and low-cost providers, with automatic fallback) instead of your Claude login, so they do not use up your Claude usage.</p>
+        <label class="check"><input type="checkbox" id="orOn"> Use OmniRoute for all agents</label>
+        <label>OmniRoute URL <input id="orUrl" placeholder="http://localhost:20128" autocomplete="off"></label>
+        <label>API key <input id="orKey" type="password" placeholder="Paste your OmniRoute key" autocomplete="off"></label>
+        <label>Default model or combo <input id="orModel" list="orModels" placeholder="auto" autocomplete="off"></label>
+        <datalist id="orModels"></datalist>
+        <details><summary>Different model per agent (optional)</summary><div id="orPer"></div></details>
+        <div class="row"><button class="primary" id="orSave">Save</button><button id="orTest">Test it</button><button id="orList">Load models</button></div>
+        <p class="note" id="orNote"></p>
+      </div>
       <div class="panel">
         <h2>Agent instructions</h2>
-        <p class="hint">Each agent's role and rules. The output format is added automatically, so the pipeline keeps working whatever you write here.</p>
+        <p class="hint" id="roleHint">Each agent's role and rules. The output format is added automatically, so the pipeline keeps working whatever you write here.</p>
         <div id="roleEdit"></div>
         <div class="row"><button class="primary" id="rolesSave">Save</button><button id="rolesReset">Reset to defaults</button></div>
         <p class="note" id="rolesNote"></p>
@@ -1895,6 +1907,33 @@ if (LIVE) {
   });
 }
 
+/* model routing (OmniRoute) */
+function renderRouting(o) {
+  $('orOn').checked = !!o.enabled; $('orUrl').value = o.baseUrl || ''; $('orModel').value = o.model || '';
+  $('orKey').value = ''; $('orKey').placeholder = o.hasKey ? 'Key saved on this computer (type to replace)' : 'Paste your OmniRoute key';
+  $('orPer').innerHTML = KEYS.map(k => `<label><span><span class="dot" style="background:${AG[k].hat}"></span> ${AG[k].name}</span><input data-ormodel="${k}" list="orModels" placeholder="same as default" value="${esc((o.models && o.models[k]) || '')}" autocomplete="off"></label>`).join('');
+}
+function loadRouting() { return bridge('GET', '/settings').then(r => renderRouting(r.omniroute)).catch(bridgeErr); }
+function routingBody() {
+  const models = {}; $('orPer').querySelectorAll('[data-ormodel]').forEach(i => { models[i.dataset.ormodel] = i.value.trim(); });
+  const b = { enabled: $('orOn').checked, baseUrl: $('orUrl').value.trim(), model: $('orModel').value.trim(), models };
+  if ($('orKey').value.trim()) b.apiKey = $('orKey').value.trim();
+  return b;
+}
+$('orSave').onclick = () => {
+  const b = routingBody();
+  if (b.enabled && !b.apiKey && !$('orKey').placeholder.startsWith('Key saved')) { $('orNote').textContent = 'Paste your OmniRoute API key first.'; return; }
+  bridge('PUT', '/settings', { omniroute: b }).then(r => { renderRouting(r.omniroute); $('orNote').textContent = r.omniroute.enabled ? 'Saved. Checking the connection…' : 'Saved. The agents use your Claude login.'; setTimeout(() => { checkLogin(0); if (r.omniroute.enabled) $('orTest').click(); }, 300); }).catch(e => { $('orNote').textContent = e.message; });
+};
+$('orTest').onclick = () => {
+  $('orNote').textContent = 'Testing…';
+  bridge('POST', '/settings/test').then(r => { $('orNote').textContent = (r.ok ? '✓ ' : '✗ ') + r.message; checkLogin(0); }).catch(e => { $('orNote').textContent = e.message; });
+};
+$('orList').onclick = () => {
+  $('orNote').textContent = 'Loading models…';
+  bridge('GET', '/settings/models').then(r => { $('orModels').innerHTML = r.models.map(m => `<option value="${esc(m)}">`).join(''); $('orNote').textContent = `${r.models.length} models and combos available. Click a model box and pick one.`; }).catch(e => { $('orNote').textContent = e.message; });
+};
+
 /* agent instructions */
 function renderRoles() {
   $('roleEdit').innerHTML = KEYS.map(k => `<label><span><span class="dot" style="background:${AG[k].hat}"></span> ${AG[k].name}</span><textarea rows="4" data-role="${k}">${esc(roles[k])}</textarea></label>`).join('')
@@ -2007,7 +2046,9 @@ function checkLogin(tries) {
     const old = document.getElementById('loginWarn'); if (old) old.remove();
     if (h.claude === 'ok' || h.claude === 'checking') return;
     const p = document.createElement('p'); p.id = 'loginWarn'; p.className = 'note bad';
-    p.innerHTML = '<b>Claude Code is not working on this computer:</b> ' + esc(h.claude) + '<br>Open Terminal, run <code>claude</code> and sign in (or set ANTHROPIC_API_KEY), then restart Agent Lab. <button class="sm" id="loginRetry">Check again</button>';
+    p.innerHTML = h.omniroute
+      ? '<b>OmniRoute is not working:</b> ' + esc(h.claude) + '<br>Make sure OmniRoute is running, the URL and key are right (Agents tab, Model routing), and the model exists. <button class="sm" id="loginRetry">Check again</button>'
+      : '<b>Claude Code is not working on this computer:</b> ' + esc(h.claude) + '<br>Open Terminal, run <code>claude</code> and sign in (or set ANTHROPIC_API_KEY), then restart Agent Lab. <button class="sm" id="loginRetry">Check again</button>';
     $('capStatus').after(p);
     $('loginRetry').onclick = () => bridge('POST', '/health/recheck').then(() => checkLogin(0)).catch(bridgeErr);
   }).catch(() => {});
@@ -2017,8 +2058,10 @@ function connectBridge() {
   loadJobs();
   loadAgentFiles();
   $('liveBtns').hidden = false;
+  $('routePanel').hidden = false;
+  loadRouting();
   $('rolesReset').textContent = 'Reload from files';
-  const hint = document.querySelector('#tab-agents .hint');
+  const hint = document.getElementById('roleHint');
   if (hint) hint.textContent = 'These edit your real agent files (' + 'the old version is kept as .bak). Keep each agent\'s Output section intact or the page cannot read its replies.';
   downloads = { save: ({ filename, data }) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type:'text/markdown' })); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); return Promise.resolve({ status:'saved' }); } };
   const es = new EventSource('/events');

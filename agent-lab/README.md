@@ -28,3 +28,16 @@ Every task has a Delete button (On the floor list, Results, the Agents tab queue
 The first click arms it ("Sure?"), the second deletes. Deleting a queued or running job cancels it: the agent
 is stopped, its station is freed and the job file is removed. The viewer also has **Run again** for repeat jobs.
 The browser tab title shows how many jobs are waiting for your approval.
+
+## OmniRoute (save your Claude usage)
+Agents tab -> **Model routing**: tick *Use OmniRoute*, paste the OmniRoute URL (default `http://localhost:20128`)
+and your OmniRoute API key, pick a default model or combo (`auto` lets OmniRoute choose), and press Save, then
+*Test it*. *Load models* lists what your OmniRoute offers. Optionally give each agent its own model
+(for example a cheap combo for the Router and Reviewer, a stronger one for the Producer).
+- OmniRoute must be running (`omniroute`). Agents then talk to it through `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN`,
+  so no Claude login is needed while it is on. Untick the box to go back to your Claude login.
+- The key is stored in `data/settings.json` (private file, git-ignored) and is never sent back to the browser.
+- In this mode the agents run with a clean environment and their own empty Claude config folder, so no Claude login
+  or API key from your shell can be passed to the gateway.
+- Environment overrides: `AGENT_LAB_OMNIROUTE=1|0`, `AGENT_LAB_OMNIROUTE_URL`, `AGENT_LAB_OMNIROUTE_KEY`, `AGENT_LAB_OMNIROUTE_MODEL`.
+- Tool use (skills, file reads, web fetch) only works if the chosen model supports tool calling.
