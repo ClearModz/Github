@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { Orchestrator, type PageEvent } from './orchestrator.js';
 import { AGENT_KEYS, TEMPLATES } from './types.js';
-import { AGENTS_DIR } from './agents.js';
+import { AGENTS_DIR, readAgentFile, writeAgentPrompt } from './agents.js';
 import { DATA_DIR } from './store.js';
 
 const PORT = Number(process.env.PORT ?? 3210);
@@ -42,7 +42,19 @@ app.post('/jobs', (req, res) => {
   const job = orch.createJob({ title: str(b.title, 80), brief, template: str(b.template, 20), priority: !!b.priority, effort: str(b.effort, 10), source: b.source });
   res.status(201).json(job);
 });
-app.delete('/jobs/:id', (req, res) => (orch.deleteJob(Number(req.params.id)) ? res.json({ ok: true }) : fail(res, 409, 'Only shipped, failed or waiting-for-input jobs can be deleted.')));
+app.delete('/jobs/:id', (req, res) => (orch.deleteJob(Number(req.params.id)) ? res.json({ ok: true }) : fail(res, 404, 'No such job.')));
+app.get('/agents', async (_req, res) => {
+  try { res.json(await Promise.all(AGENT_KEYS.map(k => readAgentFile(k)))); }
+  catch (e) { fail(res, 500, (e as Error).message); }
+});
+app.put('/agents/:key', async (req, res) => {
+  const key = req.params.key as (typeof AGENT_KEYS)[number];
+  const prompt = str(req.body?.prompt, 20000).trim();
+  if (!AGENT_KEYS.includes(key)) return fail(res, 404, 'Unknown agent.');
+  if (!prompt) return fail(res, 400, 'Instructions cannot be empty.');
+  try { await writeAgentPrompt(key, prompt); res.json({ ok: true }); }
+  catch (e) { fail(res, 500, (e as Error).message); }
+});
 app.post('/control', (req, res) => {
   const c = req.body ?? {};
   if (typeof c.type !== 'string' || (c.agent && !AGENT_KEYS.includes(c.agent))) return fail(res, 400, 'Bad command.');

@@ -23,13 +23,15 @@ const clip = (t: string, n: number) => (t.length > n ? t.slice(0, n) + '\n[...cu
 
 export interface PageEvent { type: string; agent?: AgentKey; to?: AgentKey | 'ship'; job?: Job; [k: string]: unknown }
 
-interface Station { busy: boolean; paused: boolean; boost: boolean; queue: { job: Job; go: () => void }[] }
+interface Station { busy: boolean; paused: boolean; boost: boolean; queue: { job: Job; go: (ok: boolean) => void }[] }
 
 export class Orchestrator extends EventEmitter {
   jobs = new Map<number, Job>();
   stations = {} as Record<AgentKey, Station>;
   private nextNum = 1;
-  private stageStart: Partial<Record<number, number>> = {};
+  private cancelled = new Set<number>();
+  private aborts = new Map<number, AbortController>();
+  activity: Partial<Record<AgentKey, string>> = {};
 
   constructor() {
     super();
@@ -45,7 +47,11 @@ export class Orchestrator extends EventEmitter {
     const r = all.slice(-10);
     return r.length ? r.reduce((x, y) => x + y, 0) / r.length : DEFAULT_EST[a];
   }
-  private save(job: Job) { saveJob(job); }
+  private save(job: Job) { if (!this.cancelled.has(job.num)) saveJob(job); }
+  private setActivity(a: AgentKey, text: string, job?: Job) {
+    this.activity[a] = text;
+    this.emit('event', { type: 'activity', agent: a, text, id: job?.id });
+  }
 
   /** Events that rebuild the page's picture of the floor for a newly connected browser. */
   snapshotEvents(): PageEvent[] {
@@ -53,6 +59,7 @@ export class Orchestrator extends EventEmitter {
     AGENT_KEYS.forEach(k => {
       if (this.stations[k].paused) ev.push({ type: 'agent_paused', agent: k });
       if (this.stations[k].boost) ev.push({ type: 'agent_boost', agent: k, on: true });
+      if (this.activity[k]) ev.push({ type: 'activity', agent: k, text: this.activity[k] });
     });
     for (const job of [...this.jobs.values()].sort((a, b) => a.num - b.num)) {
       if (job.status === 'shipped') continue;
@@ -92,18 +99,29 @@ export class Orchestrator extends EventEmitter {
     this.jobs.set(num, job);
     this.save(job);
     this.emitEvent({ type: 'job_created', job });
-    setTimeout(() => void this.pipeline(job, 'coord'), 1800);
+    setTimeout(() => { if (!this.cancelled.has(num)) void this.pipeline(job, 'coord'); }, 1800);
     return job;
   }
 
+  /** Deletes a job in any state. A running or queued job is cancelled first. */
   deleteJob(num: number): boolean {
     const j = this.jobs.get(num);
-    if (!j || !['shipped', 'error', 'input'].includes(j.status)) return false;
-    this.jobs.delete(num); deleteJobFile(num); return true;
+    if (!j) return false;
+    this.cancelled.add(num);
+    this.aborts.get(num)?.abort();
+    AGENT_KEYS.forEach(k => {
+      const q = this.stations[k].queue;
+      const i = q.findIndex(x => x.job === j);
+      if (i > -1) q.splice(i, 1)[0].go(false);
+    });
+    this.jobs.delete(num);
+    deleteJobFile(num);
+    this.emitEvent({ type: 'job_deleted', job: j });
+    return true;
   }
 
   /* ---------- stations ---------- */
-  private enter(a: AgentKey, job: Job): Promise<void> {
+  private enter(a: AgentKey, job: Job): Promise<boolean> {
     return new Promise(go => {
       const st = this.stations[a];
       const item = { job, go };
@@ -117,7 +135,7 @@ export class Orchestrator extends EventEmitter {
     if (st.busy || st.paused || !st.queue.length) return;
     const item = st.queue.shift()!;
     st.busy = true;
-    item.go();
+    item.go(true);
   }
   private release(a: AgentKey) { this.stations[a].busy = false; this.tryStart(a); }
 
@@ -147,6 +165,17 @@ export class Orchestrator extends EventEmitter {
           let i = 0; while (i < q.length && q[i].job.priority) i++; q.splice(i, 0, item);
         }
         this.emitEvent({ type: 'prioritized', agent: k, job });
+        break;
+      }
+      case 'pause_all': case 'resume_all': {
+        const want = cmd.type === 'pause_all';
+        AGENT_KEYS.forEach(k => {
+          const st = this.stations[k];
+          if (st.paused === want) return;
+          st.paused = want;
+          this.emitEvent({ type: want ? 'agent_paused' : 'agent_resumed', agent: k });
+          if (!want) this.tryStart(k);
+        });
         break;
       }
       default: break; // add_job (demo batches) is intentionally not supported in live mode
@@ -191,18 +220,28 @@ export class Orchestrator extends EventEmitter {
 
   /* ---------- pipeline: coordinator -> researcher? -> developer -> reviewer? ---------- */
   private async pipeline(job: Job, first: AgentKey) {
+    const gone = () => this.cancelled.has(job.num);
     let stage: AgentKey | null = first;
     while (stage) {
+      if (gone()) return;
       const a: AgentKey = stage;
       job.stage = a; job.status = 'queued'; this.save(job);
-      await this.enter(a, job);
+      const granted = await this.enter(a, job);
+      if (!granted) return;
+      if (gone()) { this.release(a); return; }
       job.status = 'working'; this.save(job);
       this.emitEvent({ type: 'task_started', agent: a, job, est: this.est(a), real: true });
+      this.setActivity(a, '', job);
       const t0 = Date.now();
+      const ac = new AbortController();
+      this.aborts.set(job.num, ac);
       let res: unknown;
       try {
-        res = await this.runStage(a, job);
+        res = await this.runStage(a, job, ac.signal);
       } catch (e) {
+        this.aborts.delete(job.num);
+        this.setActivity(a, '', job);
+        if (gone()) { this.release(a); return; }
         const msg = (e as Error).message || 'The agent call failed.';
         console.error(`Job #${job.num} ${a} failed: ${msg}`);
         job.status = 'error'; job.error = { stage: a, msg }; this.save(job);
@@ -210,6 +249,9 @@ export class Orchestrator extends EventEmitter {
         this.release(a);
         return;
       }
+      this.aborts.delete(job.num);
+      this.setActivity(a, '', job);
+      if (gone()) { this.release(a); return; }
       (job.timings[a] ??= []).push(Date.now() - t0);
       this.save(job);
       this.emitEvent({ type: 'task_finished', agent: a, job });
@@ -235,6 +277,7 @@ export class Orchestrator extends EventEmitter {
       const { out, back } = walkMs(a, to);
       this.emitEvent({ type: 'handoff', agent: a, to, hold, reject, job });
       await sleep(Math.max(HANDOFF_MIN_MS, out));
+      if (gone()) { this.release(a); return; }
       setTimeout(() => this.release(a), Math.max(0, back));
       if (to === 'ship') {
         job.status = 'awaiting'; this.save(job);
@@ -259,13 +302,17 @@ export class Orchestrator extends EventEmitter {
     };
   }
 
-  private async runStage(a: AgentKey, job: Job): Promise<unknown> {
+  private async runStage(a: AgentKey, job: Job, signal: AbortSignal): Promise<unknown> {
     const t = TEMPLATES[job.template] ?? TEMPLATES.custom;
     const onText = this.live(job, a);
     const call = async (prompt: string) => {
-      const r = await runAgent(a, prompt, job.num, onText, skill => {
-        console.log(`Job #${job.num}: ${a} used skill "${skill}"`);
-        job.skillsUsed = [...(job.skillsUsed ?? []), { agent: a, skill }];
+      const r = await runAgent(a, prompt, job.num, {
+        onText, signal,
+        onActivity: text => this.setActivity(a, text, job),
+        onSkill: skill => {
+          console.log(`Job #${job.num}: ${a} used skill "${skill}"`);
+          job.skillsUsed = [...(job.skillsUsed ?? []), { agent: a, skill }];
+        }
       });
       this.track(job, a, prompt, r.text);
       return r.text;

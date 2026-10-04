@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync, mkdirSync, readdirSync, symlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -63,7 +63,25 @@ export interface RunResult { text: string; ms: number; model?: string }
  * work dir, Bash denied unless AGENT_LAB_ALLOW_BASH=1, and an agent with no `tools:` line
  * (the developer) gets no tools unless AGENT_LAB_DEV_TOOLS lists some.
  */
-export async function runAgent(key: AgentKey, prompt: string, jobId: number, onText: (t: string) => void, onSkill: (name: string) => void = () => {}): Promise<RunResult> {
+export interface RunHooks { onText?: (t: string) => void; onSkill?: (name: string) => void; onActivity?: (text: string) => void; signal?: AbortSignal }
+
+/** One-line, human description of a tool call for the Agents tab. */
+function describeTool(name: string, input: Record<string, unknown>): string {
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  switch (name) {
+    case 'Skill': return `Loading skill "${str(input.skill)}"`;
+    case 'Read': return `Reading ${path.basename(str(input.file_path)) || 'a file'}`;
+    case 'Grep': case 'Glob': return 'Searching files';
+    case 'WebFetch': { try { return `Fetching ${new URL(str(input.url)).hostname}`; } catch { return 'Fetching a web page'; } }
+    case 'WebSearch': return `Searching the web: ${str(input.query).slice(0, 80)}`;
+    default: return `Using ${name}`;
+  }
+}
+
+export async function runAgent(key: AgentKey, prompt: string, jobId: number, hooks: RunHooks = {}): Promise<RunResult> {
+  const onText = hooks.onText ?? (() => {});
+  const onSkill = hooks.onSkill ?? (() => {});
+  const onActivity = hooks.onActivity ?? (() => {});
   const def = await loadAgent(key);
   let tools = def.tools ?? (process.env.AGENT_LAB_DEV_TOOLS ? process.env.AGENT_LAB_DEV_TOOLS.split(',').map(s => s.trim()).filter(Boolean) : []);
   if (!ALLOW_BASH) tools = tools.filter(t => t !== 'Bash');
@@ -74,6 +92,7 @@ export async function runAgent(key: AgentKey, prompt: string, jobId: number, onT
   // Skills may need to read their own files and (web-design-guidelines) fetch rules from a pinned host.
   if (useSkills) tools = [...new Set([...tools, 'Skill', 'Read', 'WebFetch'])];
   const ac = new AbortController();
+  if (hooks.signal) { if (hooks.signal.aborted) ac.abort(); else hooks.signal.addEventListener('abort', () => ac.abort(), { once: true }); }
   const timer = setTimeout(() => ac.abort(), STAGE_TIMEOUT_MS);
   const t0 = Date.now();
   let streamed = '';
@@ -116,14 +135,18 @@ export async function runAgent(key: AgentKey, prompt: string, jobId: number, onT
         if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta' && ev.delta.text) { streamed += ev.delta.text; onText(streamed); }
         else if (ev.type === 'message_start') streamed = '';
       } else if (m.type === 'assistant') {
-        for (const b of (m.message?.content ?? []) as { type: string; name?: string; input?: { skill?: string } }[])
-          if (b.type === 'tool_use' && b.name === 'Skill' && b.input?.skill) onSkill(b.input.skill);
+        for (const b of (m.message?.content ?? []) as { type: string; name?: string; input?: Record<string, unknown> }[])
+          if (b.type === 'tool_use' && b.name) {
+            onActivity(describeTool(b.name, b.input ?? {}));
+            if (b.name === 'Skill' && typeof b.input?.skill === 'string') onSkill(b.input.skill);
+          }
       } else if (m.type === 'result') {
         if (m.subtype === 'success' && !m.is_error) final = m.result;
         else throw new Error(`Agent ${def.name} failed: ${m.subtype}${'errors' in m && Array.isArray(m.errors) ? ' ' + m.errors.join('; ') : ''}`);
       }
     }
   } catch (e) {
+    if (hooks.signal?.aborted) throw new Error('Cancelled.');
     if (ac.signal.aborted) throw new Error(`Agent ${def.name} timed out after ${Math.round(STAGE_TIMEOUT_MS / 1000)}s.`);
     throw e;
   } finally {
@@ -132,4 +155,19 @@ export async function runAgent(key: AgentKey, prompt: string, jobId: number, onT
   const text = (final ?? streamed).trim();
   if (!text) throw new Error(`Agent ${def.name} returned nothing.`);
   return { text, ms: Date.now() - t0, model };
+}
+
+export interface AgentFileInfo { key: AgentKey; file: string; name: string; description: string; tools: string[] | null; prompt: string }
+export async function readAgentFile(key: AgentKey): Promise<AgentFileInfo> {
+  const d = await loadAgent(key);
+  return { key, file: path.join(AGENTS_DIR, `${AGENT_FILE[key]}.md`), name: d.name, description: d.description, tools: d.tools, prompt: d.prompt };
+}
+/** Replaces only the body of the agent file; frontmatter is kept. The previous file is saved as <name>.md.bak. */
+export async function writeAgentPrompt(key: AgentKey, prompt: string): Promise<void> {
+  const file = path.join(AGENTS_DIR, `${AGENT_FILE[key]}.md`);
+  const raw = await readFile(file, 'utf8');
+  const m = /^(---\r?\n[\s\S]*?\r?\n---\r?\n?)[\s\S]*$/.exec(raw);
+  if (!m) throw new Error('Agent file has no frontmatter.');
+  await writeFile(file + '.bak', raw);
+  await writeFile(file, m[1] + prompt.trim() + '\n');
 }

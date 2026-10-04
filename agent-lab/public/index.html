@@ -93,6 +93,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px soli
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .row input{flex:1;min-width:140px;margin:0}
 .hint,.note{font-size:13px;color:var(--muted);margin:6px 0}
+p.hint{position:static;pointer-events:auto}
 .bad{color:var(--bad)}
 .linkish{background:none;border:none;padding:0;color:var(--ink);font:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .linkish:disabled{text-decoration:none;cursor:default;opacity:1}
@@ -165,6 +166,19 @@ th{color:var(--muted);font-weight:500}
 .usebtn{position:absolute;right:16px;bottom:24px;display:none;font-family:"Pixelify Sans",ui-monospace,monospace;font-size:16px;padding:14px 20px;background:#F2C230;color:#1E2622}
 .stage.walking.touch .joy,.stage.walking.touch .usebtn{display:block}
 .stage.walking.touch .fphelp{display:none}
+
+.btns{display:flex;gap:4px;align-items:center}
+button.danger{border-color:var(--bad);color:var(--bad)}
+button.danger.hot,button.danger:hover{background:var(--bad);color:#fff}
+.lcard{border-left:4px solid var(--c);padding:6px 0 8px 10px;margin-bottom:12px}
+.lcard h3{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin:0 0 2px;font:500 15px Rubik,system-ui,sans-serif}
+.lcard h3 span{font-size:12px;color:var(--muted);font-weight:400}
+.lcard .on{font-weight:500;margin:4px 0 0}
+.lcard .sub{font-size:12px;color:var(--muted);margin:2px 0}
+.lcard .act{font-size:13px;margin:4px 0;color:var(--ink)}
+.lcard pre.tail{white-space:pre-wrap;word-break:break-word;background:#0E2416;color:#D6F5DC;padding:8px;border-radius:4px;font-size:12px;max-height:150px;overflow:auto;margin:6px 0}
+.lcard ol{list-style:none;margin:6px 0 0;padding:0}
+.lcard li{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:3px 0;border-top:1px solid var(--line);font-size:13px}
 </style>
 </head>
 <body>
@@ -265,6 +279,11 @@ th{color:var(--muted);font-weight:500}
     </section>
     <section class="tab" id="tab-agents" hidden>
       <div class="panel">
+        <h2>Live status</h2>
+        <div class="row" id="liveBtns" hidden><button class="sm" id="pauseAll">Pause all</button><button class="sm" id="resumeAll">Resume all</button></div>
+        <div id="agentLive"></div>
+      </div>
+      <div class="panel">
         <h2>Agent instructions</h2>
         <p class="hint">Each agent's role and rules. The output format is added automatically, so the pipeline keeps working whatever you write here.</p>
         <div id="roleEdit"></div>
@@ -314,9 +333,11 @@ const timers = [];
 const later = (ms, fn) => timers.push({ at: simNow + ms, fn });
 const subs = [];
 const emit = e => { e.t = simNow; subs.forEach(f => f(e)); };
+const activity = {}, lastDone = {};
 window.factoryEvent = e => {
   e = Object.assign({}, e);
   if (e.type === 'live_text') { liveText[e.agent] = e.text; return; }
+  if (e.type === 'activity') { activity[e.agent] = e.text; return; }
   if (LIVE && e.job) e.job = syncJob(e.job);
   emit(e);
 };
@@ -1083,6 +1104,7 @@ function logEvent(e) {
     case 'task_failed': msg = `${n} hit a problem on ${id}: ${e.msg}`; color = '#D04343'; break;
     case 'needs_input': msg = `Router needs your input on ${id}`; color = '#E8B931'; break;
     case 'answered': msg = `You answered the Router on ${id}`; break;
+    case 'job_deleted': msg = `${id} was deleted${e.job.status === 'working' || e.job.status === 'queued' ? ' (cancelled)' : ''}`; color = '#D04343'; break;
     case 'routed': { const r = e.job.route; msg = `Router: ${id} is ${r.task_type}, ${r.complexity} complexity → ${['Router', r.needs_research && 'Researcher', 'Producer', r.needs_review && 'Reviewer'].filter(Boolean).join(' → ')}`; break; }
     default: return;
   }
@@ -1160,10 +1182,28 @@ function sortedBoard() {
   return [...board.values()].sort((a, b) => (rank(b) - rank(a)) || (b.job.priority - a.job.priority) || a.job.id - b.job.id);
 }
 function jobButton(b) {
-  if (b.input) return `<button class="sm" data-open="${b.job.id}">Answer</button>`;
-  if (b.awaiting) return `<button class="sm" data-open="${b.job.id}">Review</button>`;
-  if (b.failed) return `<button class="sm" data-retry="${b.job.id}">Retry</button>`;
-  return `<button class="sm" data-rush="${b.job.id}" ${b.job.priority || b.shipping ? 'disabled' : ''}>${b.job.priority ? 'Rushed' : 'Rush'}</button>`;
+  let main;
+  if (b.input) main = `<button class="sm" data-open="${b.job.id}">Answer</button>`;
+  else if (b.awaiting) main = `<button class="sm" data-open="${b.job.id}">Review</button>`;
+  else if (b.failed) main = `<button class="sm" data-retry="${b.job.id}">Retry</button>`;
+  else main = `<button class="sm" data-rush="${b.job.id}" ${b.job.priority || b.shipping ? 'disabled' : ''}>${b.job.priority ? 'Rushed' : 'Rush'}</button>`;
+  return LIVE && b.job.real ? `<span class="btns">${main}${delBtn(b.job.id)}</span>` : main;
+}
+/* delete / cancel (live mode): first click arms the button, second click deletes */
+const armed = new Map();
+const delBtn = (id, label) => LIVE ? `<button class="sm danger${armed.has(id) ? ' hot' : ''}" data-del="${id}">${armed.has(id) ? 'Sure?' : (label || 'Delete')}</button>` : '';
+function rerenderLists() {
+  boardDirty = true;
+  if (curTab === 'results') renderResults();
+  if (curTab === 'agents') renderAgentsLive();
+  if (!viewer.hidden) renderViewer();
+  if (fp.panel) renderPanel();
+}
+function delJob(id) {
+  if (!armed.has(id)) { armed.set(id, setTimeout(() => { armed.delete(id); rerenderLists(); }, 3000)); rerenderLists(); return; }
+  clearTimeout(armed.get(id)); armed.delete(id);
+  bridge('DELETE', '/jobs/' + id).catch(bridgeErr);
+  rerenderLists();
 }
 function refreshJobs() {
   const list = sortedBoard();
@@ -1176,6 +1216,7 @@ jobsEl.addEventListener('click', e => {
   if (b.dataset.open) openViewer(+b.dataset.open);
   else if (b.dataset.retry) retryJob(jobsStore.get(+b.dataset.retry));
   else if (b.dataset.rush) control({ type:'rush', id:+b.dataset.rush });
+  else if (b.dataset.del) delJob(+b.dataset.del);
 });
 
 /* ---------- screen painting ---------- */
@@ -1474,6 +1515,7 @@ panelEl.addEventListener('click', e => {
   if (b.dataset.act === 'pause') control({ type:'pause_agent', agent:b.dataset.agent });
   if (b.dataset.act === 'boost') control({ type:'boost_agent', agent:b.dataset.agent });
   if (b.dataset.rush) control({ type:'rush', id:+b.dataset.rush });
+  if (b.dataset.del) { delJob(+b.dataset.del); return; }
   if (b.dataset.add) control({ type:'add_job', priority:b.dataset.add === 'pri' });
   if (b.dataset.open) { openViewer(+b.dataset.open); return; }
   if (b.dataset.retry) retryJob(jobsStore.get(+b.dataset.retry));
@@ -1558,7 +1600,7 @@ function showTab(t) {
   curTab = t;
   document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(sec => { sec.hidden = sec.id !== 'tab-' + t; });
-  const go = () => { if (t === 'results') renderResults(); else if (t === 'stats') renderStats(); else if (t === 'ideas') renderIdeas(); };
+  const go = () => { if (t === 'results') renderResults(); else if (t === 'stats') renderStats(); else if (t === 'ideas') renderIdeas(); else if (t === 'agents') renderAgentsLive(); };
   if (LIVE && (t === 'results' || t === 'stats')) loadJobs().then(go); else go();
 }
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => showTab(b.dataset.tab));
@@ -1694,7 +1736,8 @@ function renderViewer() {
       act += job.draft ? `<span class="note">Gmail draft created${job.draft.viewUrl ? ` · <a href="${esc(job.draft.viewUrl)}" target="_blank" rel="noopener">open it</a>` : ''}</span>` : '<button data-vdraft>Create Gmail draft</button>';
     act += '</div>';
   }
-  if (job.status === 'shipped' || job.status === 'error' || job.status === 'input') act += '<div class="row"><button class="sm" data-vdelete>Delete job</button></div>';
+  if (LIVE) act += `<div class="row"><button class="sm" data-vagain>Run again</button><button class="sm danger" data-vdelete>${job.status === 'queued' || job.status === 'working' ? 'Cancel and delete' : 'Delete job'}</button></div>`;
+  else if (job.status === 'shipped' || job.status === 'error' || job.status === 'input') act += '<div class="row"><button class="sm" data-vdelete>Delete job</button></div>';
   $('vActions').innerHTML = act;
   if ($('vNotes')) $('vNotes').value = keep;
 }
@@ -1711,6 +1754,7 @@ viewer.addEventListener('click', e => {
   else if ('vcopy' in d) navigator.clipboard.writeText(job.out.final).then(() => toast('Copied.'), () => toast('Copy is blocked here. Use Download instead.'));
   else if ('vdl' in d) downloads.save({ filename:`job-${job.num}.md`, data:`# ${job.title}\n\n${job.out.final}\n` }).then(r => { if (r && r.status === 'saved') toast('Saved.'); }, () => {});
   else if ('vdraft' in d) makeDraft(job, b);
+  else if ('vagain' in d) mk({ title: job.title, brief: job.brief, template: job.template, effort: job.effort }).then(j => toast(`Job #${j.num} is on the intake belt.`), bridgeErr);
   else if ('vdelete' in d) {
     if (!d.armed) { d.armed = '1'; b.textContent = 'Click again to delete'; return; }
     if (LIVE) bridge('DELETE', '/jobs/' + job.id).catch(bridgeErr); jobsStore.delete(job.id); deleteDoc('job_' + job.num); delete simJobs[job.id]; if (board.delete(job.id)) boardDirty = true; closeViewer(); renderResults(); toast('Deleted.');
@@ -1723,11 +1767,11 @@ function renderResults() {
   const q = $('rq').value.trim().toLowerCase(), f = $('rf').value;
   const list = [...jobsStore.values()].filter(j => (f === 'all' || (f === 'active' ? (j.status === 'queued' || j.status === 'working') : j.status === f))
     && (!q || (j.title + ' ' + (j.out.final || '')).toLowerCase().includes(q))).sort((a, b) => b.num - a.num);
-  $('rList').innerHTML = list.length ? list.slice(0, 100).map(j => `<li><div class="nm"><button class="linkish" data-open="${j.id}">#${j.num} ${esc(j.title)}</button><span class="wh">${esc((TEMPLATES[j.template] || TEMPLATES.custom).name)} · ${STATUS[j.status] || j.status}${j.out.review ? ' · ' + j.out.review.score + '/10' : ''} · ${new Date(j.createdAt).toLocaleDateString()}</span></div>${j.status === 'awaiting' ? `<button class="sm" data-open="${j.id}">Review</button>` : ''}</li>`).join('')
+  $('rList').innerHTML = list.length ? list.slice(0, 100).map(j => `<li><div class="nm"><button class="linkish" data-open="${j.id}">#${j.num} ${esc(j.title)}</button><span class="wh">${esc((TEMPLATES[j.template] || TEMPLATES.custom).name)} · ${STATUS[j.status] || j.status}${j.out.review ? ' · ' + j.out.review.score + '/10' : ''} · ${new Date(j.createdAt).toLocaleDateString()}</span></div><span class="btns">${j.status === 'awaiting' ? `<button class="sm" data-open="${j.id}">Review</button>` : ''}${delBtn(j.id, 'Delete')}</span></li>`).join('')
     : '<li class="empty">No jobs yet. Send one from the New job tab.</li>';
 }
 $('rq').oninput = renderResults; $('rf').onchange = renderResults;
-$('rList').addEventListener('click', e => { const b = e.target.closest('[data-open]'); if (b) openViewer(+b.dataset.open); });
+$('rList').addEventListener('click', e => { const d = e.target.closest('[data-del]'); if (d) { delJob(+d.dataset.del); return; } const b = e.target.closest('[data-open]'); if (b) openViewer(+b.dataset.open); });
 
 /* follow-through board */
 function newIdea(text) {
@@ -1783,17 +1827,94 @@ $('ideaList').addEventListener('change', e => {
   saveDoc(idea.id, idea); renderIdeas();
 });
 
+/* live agent status */
+const clipTxt = (t, n) => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
+const mmss = sec => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+function agentCard(k) {
+  const w = workers[k], st = agentStatus(k), job = w.status === 'working' ? w.job : null;
+  let h = `<div class="lcard" style="--c:${AG[k].hat}"><h3>${AG[k].name}<span>${esc(st.text)}${w.boost ? ' · boosted' : ''}</span></h3>`;
+  if (job) {
+    const t = TEMPLATES[job.template] || TEMPLATES.custom;
+    h += `<p class="on">#${job.id} ${esc(job.name)}</p><p class="sub">${esc(t.name)} · ${AG[k].verb} · <span class="elap" data-since="${w.realStart}"></span> elapsed${job.priority ? ' · priority' : ''}</p>`
+      + (job.brief ? `<p class="sub">Brief: ${esc(clipTxt(job.brief, 160))}</p>` : '')
+      + (activity[k] ? `<p class="act">▸ ${esc(activity[k])}</p>` : '')
+      + (liveText[k] ? `<pre class="tail" data-k="${k}"></pre>` : '');
+  } else if (w.status === 'walking') h += `<p class="sub">${esc(st.text)}</p>`;
+  else h += `<p class="sub">${w.paused ? 'Paused. It will not pick up new work.' : 'Idle. Nothing assigned right now.'}</p>`;
+  if (lastDone[k] && !job) h += `<p class="sub">Last: finished #${lastDone[k].id} ${esc(clipTxt(lastDone[k].name, 40))} in ${mmss(Math.round(lastDone[k].ms / 1000))}</p>`;
+  if (inbox[k].length) h += `<ol>${inbox[k].map(j => `<li><span class="${j.priority ? 'pri' : ''}">#${j.id} ${esc(clipTxt(j.name, 40))}</span><span class="btns"><button class="sm" data-rush="${j.id}" ${j.priority ? 'disabled' : ''}>${j.priority ? 'Rushed' : 'Rush'}</button>${j.real ? delBtn(j.id) : ''}</span></li>`).join('')}</ol>`;
+  h += `<div class="row"><button class="sm" data-act="pause" data-agent="${k}">${w.paused ? 'Resume' : 'Pause'}</button><button class="sm" data-act="boost" data-agent="${k}" aria-pressed="${w.boost}">Boost 2×</button>${job && job.real ? delBtn(job.id, 'Cancel job') : ''}</div></div>`;
+  return h;
+}
+let agentHeld = false, lastAgentHtml = '';
+function renderAgentsLive() {
+  const el = $('agentLive'); if (!el || agentHeld) return;   // never swap buttons out from under a press
+  const h = KEYS.map(agentCard).join('');
+  if (h !== lastAgentHtml) { lastAgentHtml = h; el.innerHTML = h; }
+  // the parts that change every second are updated in place so buttons are never replaced
+  el.querySelectorAll('.elap').forEach(n => { n.textContent = mmss(Math.max(0, Math.round((performance.now() - +n.dataset.since) / 1000))); });
+  el.querySelectorAll('pre.tail').forEach(n => { const t = liveText[n.dataset.k].slice(-500); if (n.textContent !== t) { const atEnd = n.scrollTop + n.clientHeight >= n.scrollHeight - 4; n.textContent = t; if (atEnd) n.scrollTop = n.scrollHeight; } });
+}
+$('agentLive').addEventListener('pointerdown', () => { agentHeld = true; });
+['pointerup', 'pointercancel'].forEach(t => document.addEventListener(t, () => { agentHeld = false; }));
+$('agentLive').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.act === 'pause') control({ type:'pause_agent', agent:b.dataset.agent });
+  else if (b.dataset.act === 'boost') control({ type:'boost_agent', agent:b.dataset.agent });
+  else if (b.dataset.rush) control({ type:'rush', id:+b.dataset.rush });
+  else if (b.dataset.del) delJob(+b.dataset.del);
+});
+setInterval(() => { if (curTab === 'agents') renderAgentsLive(); }, 700);
+$('pauseAll').onclick = () => control({ type:'pause_all' });
+$('resumeAll').onclick = () => control({ type:'resume_all' });
+
+/* live-mode extras: deletions, badge, last finished per agent */
+if (LIVE) {
+  const baseTitle = document.title;
+  subs.push(e => {
+    if (e.type === 'task_finished' && workers[e.agent]) lastDone[e.agent] = { id:e.job.id, name:e.job.name, ms: performance.now() - (workers[e.agent].realStart || performance.now()) };
+    if (e.type === 'task_started' || e.type === 'task_finished') activity[e.agent] = '';
+    if (e.type === 'job_deleted') {
+      const id = e.job.id;
+      jobsStore.delete(id); board.delete(id);
+      KEYS.forEach(k => {
+        const i = inbox[k].findIndex(j => j.id === id); if (i > -1) inbox[k].splice(i, 1);
+        const w = workers[k];
+        if (w.job && w.job.id === id && w.status === 'working') { w.status = 'idle'; w.job = null; liveText[k] = ''; activity[k] = ''; }
+        if (w.pending && w.pending.job.id === id) w.pending = null;
+        w.trips = w.trips.filter(t => t.job.id !== id);
+        if (w.carry && w.carry.id === id) w.carry = null;
+      });
+      const h = holdJobs.findIndex(j => j.id === id); if (h > -1) holdJobs.splice(h, 1);
+      const c = conveyor.findIndex(c => c.id === id); if (c > -1) { scene.remove(conveyor[c].mesh); conveyor.splice(c, 1); }
+      armed.delete(id);
+      if (viewerId === id) closeViewer();
+      boardDirty = true; updateStats();
+    }
+    document.title = (holdJobs.length ? `(${holdJobs.length}) ` : '') + baseTitle;
+  });
+}
+
 /* agent instructions */
 function renderRoles() {
   $('roleEdit').innerHTML = KEYS.map(k => `<label><span><span class="dot" style="background:${AG[k].hat}"></span> ${AG[k].name}</span><textarea rows="4" data-role="${k}">${esc(roles[k])}</textarea></label>`).join('')
     + (legacyRoles ? `<details><summary>Your previous instructions (from the old pipeline)</summary>${KEYS.map(k => legacyRoles[k] ? `<p class="hint"><b>${AG[k].name}:</b></p><pre class="brief">${esc(legacyRoles[k])}</pre>` : '').join('')}</details>` : '');
 }
 $('rolesSave').onclick = async () => {
+  if (LIVE) {
+    const next = {}; let bad = false;
+    $('roleEdit').querySelectorAll('[data-role]').forEach(t => { next[t.dataset.role] = t.value.trim(); if (!next[t.dataset.role]) bad = true; });
+    if (bad) { $('rolesNote').textContent = 'An agent needs instructions. Nothing was saved.'; return; }
+    try { await Promise.all(KEYS.map(k => bridge('PUT', '/agents/' + k, { prompt: next[k] }))); roles = { ...roles, ...next }; $('rolesNote').textContent = 'Saved to your agent files (the old version is kept as .bak). The next stages use them.'; }
+    catch (e) { $('rolesNote').textContent = (e && e.message) || 'Could not save.'; }
+    return;
+  }
   $('roleEdit').querySelectorAll('[data-role]').forEach(t => { roles[t.dataset.role] = t.value.trim() || DEFAULT_ROLES[t.dataset.role]; });
   const ok = await saveDoc('config', { kind:'config', roles, rolesVersion:ROLES_VERSION, legacyRoles });
   $('rolesNote').textContent = ok ? 'Saved. The next stages use these instructions.' : (db ? 'Could not save.' : 'Applied for this visit (saving is off).');
 };
-$('rolesReset').onclick = () => { roles = { ...DEFAULT_ROLES }; renderRoles(); $('rolesNote').textContent = 'Defaults restored. Press Save to keep them.'; };
+$('rolesReset').onclick = () => {
+  if (LIVE) { loadAgentFiles().then(() => { $('rolesNote').textContent = 'Reloaded from your agent files.'; }); return; } roles = { ...DEFAULT_ROLES }; renderRoles(); $('rolesNote').textContent = 'Defaults restored. Press Save to keep them.'; };
 
 /* stats */
 function renderStats() {
@@ -1841,7 +1962,7 @@ let uiT = null;
 subs.push(e => {
   if (!viewer.hidden && e.job && e.job.id === viewerId) renderViewer();
   clearTimeout(uiT);
-  uiT = setTimeout(() => { if (curTab === 'results') renderResults(); else if (curTab === 'stats') renderStats(); }, 400);
+  uiT = setTimeout(() => { if (curTab === 'results') renderResults(); else if (curTab === 'stats') renderStats(); else if (curTab === 'agents') renderAgentsLive(); }, 400);
 });
 
 /* boot: connect capabilities, restore saved work */
@@ -1877,8 +1998,17 @@ async function boot() {
   if (!sample && !LIVE) setDemo(true);
 }
 window.onFactoryControl = cmd => { bridge('POST', '/control', cmd).catch(bridgeErr); };
+function loadAgentFiles() {
+  return bridge('GET', '/agents').then(list => { list.forEach(a => { roles[a.key] = a.prompt; }); renderRoles(); }).catch(bridgeErr);
+}
 function connectBridge() {
   loadJobs();
+  loadAgentFiles();
+  $('liveBtns').hidden = false;
+  $('rolesReset').textContent = 'Reload from files';
+  const hint = document.querySelector('#tab-agents .hint');
+  if (hint) hint.textContent = 'These edit your real agent files (' + 'the old version is kept as .bak). Keep each agent\'s Output section intact or the page cannot read its replies.';
+  downloads = { save: ({ filename, data }) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type:'text/markdown' })); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); return Promise.resolve({ status:'saved' }); } };
   const es = new EventSource('/events');
   es.onmessage = m => { try { window.factoryEvent(JSON.parse(m.data)); } catch (err) { console.error('bad bridge event', err); } };
   es.onerror = () => { $('capStatus').firstChild && ($('capStatus').firstChild.className = 'off'); };
