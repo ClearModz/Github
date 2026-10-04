@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0e14">
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 <title>Chartroom — Private Pilot Study</title>
 <meta name="description" content="Study for the US Private Pilot checkride. Practice reading sectionals in 3D next to live airspace.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -10,7 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600;800&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
 <style>
-:root{--bg:#0a0e14;--panel:#111824;--line:#1e2a3b;--ink:#e8eef7;--mute:#8a9bb3;--amber:#ffb020;--blue:#3b82f6;--mag:#d946ef;--ok:#34d399;--bad:#f87171}
+:root{color-scheme:dark;--bg:#0a0e14;--panel:#111824;--line:#1e2a3b;--ink:#e8eef7;--mute:#8a9bb3;--amber:#ffb020;--blue:#3b82f6;--mag:#d946ef;--ok:#34d399;--bad:#f87171}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:Sora,system-ui,sans-serif;line-height:1.5}
 a{color:inherit}
@@ -51,6 +55,28 @@ h2{font-size:clamp(28px,4vw,48px);margin:0 0 .3em;letter-spacing:-.02em}
 .chip{position:absolute;z-index:5;left:12px;top:12px;padding:6px 12px;border-radius:99px;background:rgba(10,14,20,.85);font-size:12px;border:1px solid var(--line)}
 .revchip{background:#ffb020;color:#1a1000;padding:5px 9px;border-radius:9px;text-align:center;font-size:14px;line-height:1.15;box-shadow:0 4px 18px rgba(0,0,0,.5);pointer-events:none;border:2px solid #1a1000}
 .revchip small{display:block;font-size:10px;font-weight:600;letter-spacing:.04em}
+button,label,input[type=range],input[type=checkbox]{touch-action:manipulation}
+.btn:focus-visible,.opt:focus-visible,#quiz button:focus-visible,.bar input:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.bar .loc{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:12px 32px;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:#0d1420}
+.bar .loc label.sw{position:relative;display:flex;align-items:center;gap:14px;min-height:44px;cursor:pointer;color:var(--ink)}
+.bar .loc .sw input{position:absolute;left:0;top:50%;width:48px;height:44px;margin:-22px 0 0;opacity:0;cursor:pointer}
+.bar .loc .track{position:relative;flex:none;width:48px;height:28px;border-radius:999px;background:#18222f;border:1px solid var(--line);transition:background-color .2s,border-color .2s}
+.bar .loc .track::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--mute);transition:transform .25s cubic-bezier(.16,1,.3,1),background-color .2s}
+.bar .loc .sw:hover .track{border-color:var(--mute)}
+.bar .loc .sw input:checked+.track{background:rgba(255,176,32,.16);border-color:var(--amber)}
+.bar .loc .sw input:checked+.track::after{transform:translateX(20px);background:var(--amber)}
+.bar .loc .sw input:focus-visible+.track{outline:2px solid var(--amber);outline-offset:3px}
+.bar .loc .sw-t{display:flex;flex-direction:column;gap:2px}
+.bar .loc .sw-t b{display:flex;align-items:center;gap:7px;font-weight:600;font-size:14px;color:var(--ink)}
+.bar .loc .sw-t b i{color:var(--amber);font-size:17px}
+.bar .loc .sw-t small{font-size:12px;color:var(--mute);max-width:46ch;text-wrap:pretty}
+.bar .loc .rad{display:flex;align-items:center;gap:12px;min-height:44px}
+.bar .loc .rad label{color:var(--mute)}
+.bar .loc .rad input[type=range]{width:min(220px,40vw);height:44px}
+.bar .loc .rad output{min-width:6ch;color:var(--amber);font-variant-numeric:tabular-nums}
+.bar .loc .rad:has(input:disabled){opacity:.45}
+.bar .loc .loc-st{flex-basis:100%;font-size:12px;color:var(--mute);text-wrap:pretty}
+@media(prefers-reduced-motion:reduce){.bar .loc .track,.bar .loc .track::after{transition:none}}
 .chip.h{left:12px;top:48px;color:var(--mute);font-size:11px}
 .chip.r{left:auto;right:12px;top:auto;bottom:28px}
 .legend{position:absolute;z-index:5;left:12px;bottom:28px;padding:8px 12px;border-radius:10px;background:rgba(10,14,20,.88);font-size:11px;border:1px solid var(--line)}
@@ -89,7 +115,20 @@ footer{padding:40px 5vw;border-top:1px solid var(--line);color:var(--mute);font-
   <h2 class="reveal">Sectional Practice</h2>
   <p class="lead reveal">Left: FAA VFR Sectional on 3D terrain. Right: live FAA airspace, with the floor and ceiling of each area. Click either side for details.</p>
   <div class="bar reveal">
-    <label><input type="checkbox" id="link" checked> Link maps</label>
+    <div class="loc" id="loc">
+      <label class="sw" for="useLoc">
+        <input type="checkbox" role="switch" id="useLoc" name="useLocation" autocomplete="off" aria-describedby="locHint">
+        <span class="track" aria-hidden="true"></span>
+        <span class="sw-t"><b><i class="ph ph-map-pin" aria-hidden="true"></i>Use my location</b><small id="locHint">Practice with airports near you. Your position stays in this browser.</small></span>
+      </label>
+      <div class="rad">
+        <label for="locRad">Search radius</label>
+        <input type="range" id="locRad" name="radius" min="25" max="300" step="25" value="150" disabled autocomplete="off" aria-describedby="locRadOut">
+        <output id="locRadOut" for="locRad" class="mono">150&nbsp;mi</output>
+      </div>
+      <div class="mono loc-st" id="locStat" role="status" aria-live="polite" hidden></div>
+    </div>
+    <label><input type="checkbox" id="link" checked autocomplete="off"> Link maps</label>
     <label>Terrain <input type="range" id="exag" min="0" max="3" step=".1" value="1.5"></label>
     <label>Tilt <input type="range" id="tilt" min="0" max="75" step="1" value="55"></label>
     <label><input type="checkbox" id="lbl" checked> Airspace labels</label>
@@ -100,9 +139,7 @@ footer{padding:40px 5vw;border-top:1px solid var(--line);color:var(--mute);font-
     <label><input type="checkbox" class="cls" value="C" checked> C</label>
     <label><input type="checkbox" class="cls" value="D" checked> D</label>
     <label><input type="checkbox" class="cls" value="E" checked> E</label>
-    <label title="Asks your browser for your location. It never leaves this page."><input type="checkbox" id="useLoc"> 📍 Use my location</label>
     <button class="btn sm" id="newq">▶ Practice mode</button>
-    <div class="mono" id="locStat" style="flex-basis:100%;color:var(--mute);font-size:12px" hidden></div>
   </div>
   <div class="split">
     <div class="pane"><div id="mapL"></div><div class="chip mono">VFR SECTIONAL · 3D</div></div>
@@ -295,67 +332,81 @@ mapR.on('click',e=>{
 // LOCAL.airports  nearest airports [{ident,name,city,type,lat,lon,elev,nm,dir}] sorted by distance
 // LOCAL.pick()    a random nearby airport (bigger fields are favoured)
 // LOCAL.subscribe(fn)  fn(LOCAL) runs whenever the location is switched on, off or updated
-const LOCAL={on:false,pos:null,airports:[],_subs:[],
+const LOCAL={on:false,pos:null,pool:[],radiusMi:150,airports:[],_subs:[],
+  setRadius(mi){this.radiusMi=mi;this.airports=this.pool.filter(a=>a.nm*1.15078<=mi)},
+  mi:nm=>nm*1.15078,
   subscribe(fn){this._subs.push(fn)},_emit(){this._subs.forEach(f=>{try{f(this)}catch(e){console.error(e)}})},
   rad:d=>d*Math.PI/180,
   nm(la1,lo1,la2,lo2){const R=3440.065,p=this.rad,a=Math.sin(p(la2-la1)/2)**2+Math.cos(p(la1))*Math.cos(p(la2))*Math.sin(p(lo2-lo1)/2)**2;return 2*R*Math.asin(Math.sqrt(a))},
   bearing(la1,lo1,la2,lo2){const p=this.rad,y=Math.sin(p(lo2-lo1))*Math.cos(p(la2)),x=Math.cos(p(la1))*Math.sin(p(la2))-Math.sin(p(la1))*Math.cos(p(la2))*Math.cos(p(lo2-lo1));return (Math.atan2(y,x)*180/Math.PI+360)%360},
   compass(b){return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(b/22.5)%16]},
-  pick(){const w=this.airports.slice(0,10).map(a=>({a,w:a.type==='large_airport'?3:a.type==='medium_airport'?2:1}));let t=w.reduce((s,x)=>s+x.w,0)*Math.random();for(const x of w){t-=x.w;if(t<=0)return x.a}return w[0].a}
+  _last:null,
+  pick(){const pool=this.airports.length>1?this.airports.filter(a=>a.ident!==this._last):this.airports;const w=pool.map(a=>({a,w:a.type==='large_airport'?4:a.type==='medium_airport'?2.5:1}));let t=w.reduce((s,x)=>s+x.w,0)*Math.random();let pick=w[0].a;for(const x of w){t-=x.w;if(t<=0){pick=x.a;break}}this._last=pick.ident;return pick}
 };
 const APT_CSV='https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv';
 function csvLine(l){const o=[];let c='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(q){if(ch==='"'){if(l[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}else if(ch==='"')q=true;else if(ch===','){o.push(c);c=''}else c+=ch}o.push(c);return o}
 async function loadAirportsNear(lat,lon){
-  const key='chartroom.localApts',k=lat.toFixed(1)+','+lon.toFixed(1);
+  const key='chartroom.localApts3',k=lat.toFixed(1)+','+lon.toFixed(1),MAXMI=300,maxNm=MAXMI/1.15078,dLat=maxNm/60+.3,dLon=dLat/Math.max(.2,Math.cos(lat*Math.PI/180));
   try{const c=JSON.parse(localStorage.getItem(key)||'null');if(c&&c.k===k&&Date.now()-c.t<30*864e5&&c.airports.length)return c.airports}catch(e){}
   const txt=await (await fetch(APT_CSV)).text();
   const lines=txt.split('\n');const h=csvLine(lines[0]);const ix=n=>h.indexOf(n);
-  const I={id:ix('ident'),type:ix('type'),name:ix('name'),lat:ix('latitude_deg'),lon:ix('longitude_deg'),el:ix('elevation_ft'),city:ix('municipality'),icao:ix('icao_code'),gps:ix('gps_code')};
+  const I={id:ix('ident'),type:ix('type'),name:ix('name'),lat:ix('latitude_deg'),lon:ix('longitude_deg'),el:ix('elevation_ft'),city:ix('municipality'),icao:ix('icao_code'),gps:ix('gps_code'),iata:ix('iata_code'),sched:ix('scheduled_service'),wiki:ix('wikipedia_link'),home:ix('home_link')};
   const ok=new Set(['large_airport','medium_airport','small_airport']);
   const all=[];
   for(let i=1;i<lines.length;i++){
     const l=lines[i];if(!l)continue;
     const f=csvLine(l);if(!ok.has(f[I.type]))continue;
-    const la=+f[I.lat],lo=+f[I.lon];if(Math.abs(la-lat)>3||Math.abs(lo-lon)>4.5)continue;   // cheap pre-filter before the real distance
+    // thousands of tiny private strips are in the data: for small fields keep only ones that look public (ICAO or IATA code, airline service, a website or a Wikipedia page)
+    if(f[I.type]==='small_airport'&&!(f[I.icao]||f[I.iata]||f[I.sched]==='yes'||f[I.wiki]||f[I.home]||/^K[A-Z0-9]{3}$/.test(f[I.gps]||'')))continue;
+    const la=+f[I.lat],lo=+f[I.lon];if(Math.abs(la-lat)>dLat||Math.abs(lo-lon)>dLon)continue;   // cheap pre-filter before the real distance
     const nm=LOCAL.nm(lat,lon,la,lo);
     all.push({ident:f[I.icao]||f[I.gps]||f[I.id],name:f[I.name],city:f[I.city],type:f[I.type],lat:la,lon:lo,elev:Math.round(+f[I.el])||0,nm,dir:LOCAL.compass(LOCAL.bearing(lat,lon,la,lo))});
   }
   all.sort((a,b)=>a.nm-b.nm);
-  const list=all.filter(a=>a.nm<=40);const out=(list.length>=3?list:all.filter(a=>a.nm<=120)).slice(0,14);
+  const out=all.filter(a=>a.nm<=maxNm).slice(0,400);
   try{localStorage.setItem(key,JSON.stringify({k,t:Date.now(),airports:out}))}catch(e){}
   return out;
 }
 function showLocalOnMap(){
   if(!mapR.getSource('local')){
     mapR.addSource('local',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
-    mapR.addLayer({id:'local-dot',type:'circle',source:'local',paint:{'circle-radius':5,'circle-color':'#ffb020','circle-stroke-color':'#0a0e14','circle-stroke-width':2}});
-    mapR.addLayer({id:'local-lbl',type:'symbol',source:'local',layout:{'text-field':['get','ident'],'text-font':['Open Sans Regular'],'text-size':12,'text-offset':[0,1.1],'text-anchor':'top','text-allow-overlap':true},paint:{'text-color':'#ffb020','text-halo-color':'#0a0e14','text-halo-width':1.6}});
+    mapR.addLayer({id:'local-dot',type:'circle',source:'local',paint:{'circle-radius':['match',['get','rank'],0,6,1,5,3.5],'circle-color':'#ffb020','circle-stroke-color':'#0a0e14','circle-stroke-width':2}});
+    mapR.addLayer({id:'local-lbl',type:'symbol',source:'local',layout:{'text-field':['get','ident'],'text-font':['Open Sans Regular'],'text-size':12,'text-offset':[0,1.1],'text-anchor':'top','text-optional':true,'symbol-sort-key':['get','rank']},paint:{'text-color':'#ffb020','text-halo-color':'#0a0e14','text-halo-width':1.6}});
   }
-  mapR.getSource('local').setData({type:'FeatureCollection',features:LOCAL.on?LOCAL.airports.map(a=>({type:'Feature',properties:{ident:a.ident},geometry:{type:'Point',coordinates:[a.lon,a.lat]}})):[]});
+  mapR.getSource('local').setData({type:'FeatureCollection',features:LOCAL.on?LOCAL.airports.map(a=>({type:'Feature',properties:{ident:a.ident,rank:a.type==='large_airport'?0:a.type==='medium_airport'?1:2},geometry:{type:'Point',coordinates:[a.lon,a.lat]}})):[]});
 }
 function nearTxt(){
   if(!near)return '';
-  const a=near.a;return `<br><span class="mono" style="color:var(--amber);font-size:13px">📍 The pin is ${near.nm.toFixed(1)} NM ${near.dir} of ${a.name}${a.ident?' ('+a.ident+')':''}${a.city?', '+a.city:''}, field elevation ${a.elev.toLocaleString()} ft. Find it on the chart.</span>`;
+  const a=near.a,away=Math.round(LOCAL.mi(a.nm));return `<br><span class="mono" style="color:var(--amber);font-size:13px"><i class="ph ph-map-pin" aria-hidden="true"></i> The pin is ${near.nm.toFixed(1)} NM ${near.dir} of ${a.name}${a.ident?' ('+a.ident+')':''}${a.city?', '+a.city:''}, field elevation ${a.elev.toLocaleString()} ft. That field is about ${away}&nbsp;mi from you. Find it on the chart.</span>`;
+}
+const fmtMi=n=>n.toLocaleString('en-US');
+function locStatus(){
+  const st=$('locStat');st.hidden=false;
+  if(!LOCAL.on){st.textContent='Location is off. Using the built-in example airports.';return}
+  const n=LOCAL.airports.length;
+  if(!n){st.textContent=`No airports found within ${LOCAL.radiusMi}\u00a0mi. Increase the radius to get more examples.`;return}
+  const f=LOCAL.airports[0];
+  st.textContent=`${n} ${n===1?'airport':'airports'} within ${LOCAL.radiusMi}\u00a0mi. Nearest: ${f.name} (${f.ident}), ${fmtMi(Math.round(LOCAL.mi(f.nm)))}\u00a0mi ${f.dir}.`;
 }
 async function enableLocation(){
-  const box=$('useLoc'),st=$('locStat');st.hidden=false;
-  const fail=m=>{box.checked=false;LOCAL.on=false;LOCAL.airports=[];st.textContent=m;showLocalOnMap();LOCAL._emit()};
+  const box=$('useLoc'),st=$('locStat'),rad=$('locRad');st.hidden=false;
+  const fail=m=>{box.checked=false;LOCAL.on=false;LOCAL.airports=[];LOCAL.pool=[];rad.disabled=true;st.textContent=m;showLocalOnMap();LOCAL._emit()};
   if(!navigator.geolocation)return fail('This browser cannot share a location. Using the built-in examples.');
   st.textContent='Waiting for your browser to share your location…';
   navigator.geolocation.getCurrentPosition(async pos=>{
     try{
       const lat=pos.coords.latitude,lon=pos.coords.longitude;
       st.textContent='Finding airports near you…';
-      const list=await loadAirportsNear(lat,lon);
-      if(!list.length)return fail('No airports found near you. Using the built-in examples.');
-      LOCAL.pos={lat,lon};LOCAL.airports=list;LOCAL.on=true;
-      st.textContent=`Using your location: ${list.length} airports nearby. Nearest: ${list[0].name} (${list[0].ident}), ${list[0].nm.toFixed(1)} NM ${list[0].dir}. Your position stays in this browser.`;
-      showLocalOnMap();LOCAL._emit();
-      mapL.jumpTo({center:[list[0].lon,list[0].lat],zoom:10.5});
-    }catch(e){fail('Could not load the airport list (check your connection). Using the built-in examples.')}
-  },err=>fail(err.code===1?'Location permission was denied. Allow it in your browser (the lock icon by the address), then tick the box again.':'Could not get your location'+(location.protocol==='file:'?'. If you opened this file directly, serve the folder from localhost instead (python3 -m http.server).':'. Try again.')),{enableHighAccuracy:false,timeout:15000,maximumAge:600000});
+      const pool=await loadAirportsNear(lat,lon);
+      if(!pool.length)return fail('No airports found near you. Using the built-in examples.');
+      LOCAL.pos={lat,lon};LOCAL.pool=pool;LOCAL.on=true;LOCAL.setRadius(+rad.value);rad.disabled=false;
+      locStatus();showLocalOnMap();LOCAL._emit();
+      const f=LOCAL.airports[0]||pool[0];mapL.jumpTo({center:[f.lon,f.lat],zoom:10.5});
+    }catch(e){fail('Could not load the airport list. Check your connection and try again. Using the built-in examples.')}
+  },err=>fail(err.code===1?'Location permission was denied. Allow it in your browser (the lock icon by the address), then turn this on again.':'Could not get your location'+(location.protocol==='file:'?'. If you opened this file directly, serve the folder from localhost instead (python3 -m http.server).':'. Try again.')),{enableHighAccuracy:false,timeout:15000,maximumAge:600000});
 }
-$('useLoc').onchange=e=>{if(e.target.checked)enableLocation();else{LOCAL.on=false;LOCAL.airports=[];$('locStat').textContent='Location off. Using the built-in examples.';showLocalOnMap();LOCAL._emit()}};
+$('useLoc').onchange=e=>{if(e.target.checked)enableLocation();else{LOCAL.on=false;LOCAL.airports=[];$('locRad').disabled=true;locStatus();showLocalOnMap();LOCAL._emit()}};
+$('locRad').oninput=e=>{const v=+e.target.value;$('locRadOut').innerHTML=v+'&nbsp;mi';e.target.setAttribute('aria-valuetext',v+' miles');if(LOCAL.on){LOCAL.setRadius(v);locStatus();showLocalOnMap();LOCAL._emit()}};
 
 // ---------- practice mode ----------
 const SPOTS=[[47.449,-122.309],[47.907,-122.282],[47.268,-122.578],[45.589,-122.595],[39.856,-104.674],[40.788,-111.978],[30.194,-97.67],[42.364,-71.005],[33.943,-118.408],[41.978,-87.904],[33.64,-84.427],[25.793,-80.29],[36.08,-115.152],[44.88,-93.217],[39.049,-77.46]];
@@ -449,7 +500,7 @@ async function startQuiz(){
     const ok=t==='Class '+cls;mark(ok,b,'Class '+cls);setQuizVis(false);
     const p=top?.properties;
     if(!ok)revealOnChart(top,cls,false);
-    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} It’s <b>Class ${cls}</b>${p?` — ${p.NAME||''}, floor ${p.floor}, ceiling ${p.ceil}`:''}.<br>${KEY[cls]}<br>${ok?'':'📍 Look at the sectional (left): the correct airspace is outlined in amber.<br>'}`;
+    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} It’s <b>Class ${cls}</b>${p?` — ${p.NAME||''}, floor ${p.floor}, ceiling ${p.ceil}`:''}.<br>${KEY[cls]}<br>${ok?'':'<i class="ph ph-map-pin" aria-hidden="true"></i> Look at the sectional (left): the correct airspace is outlined in amber.<br>'}`;
     if(top&&p.ceil!=='n/a'){const n=document.createElement('button');n.className='btn sm';n.textContent='Q2: ceiling →';n.style.marginTop='10px';n.onclick=()=>q2(top);$('fb').appendChild(n)}else next();
   });
 }
@@ -463,7 +514,7 @@ function q2(feat){
   showQ(`<b>Q2.</b> What is the <u>ceiling</u> of that Class ${p.CLASS} airspace (${p.NAME||'at the pin'})?`,opts,(t,b)=>{
     const ok=t===p.ceil;mark(ok,b,p.ceil);setQuizVis(false);
     if(!ok)revealOnChart(feat,p.CLASS,true);
-    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} Ceiling <b>${p.ceil}</b>, floor <b>${p.floor}</b>. On the sectional, look for the numbers in the boundary: the top is the upper value, the bottom is the lower (“SFC” means surface).<br>${ok?'':'📍 The amber tag on the sectional (left) shows how the chart prints it, in hundreds of feet: ceiling over floor.<br>'}`;
+    $('fb').innerHTML=`${ok?'✅ Correct.':'❌ Not quite.'} Ceiling <b>${p.ceil}</b>, floor <b>${p.floor}</b>. On the sectional, look for the numbers in the boundary: the top is the upper value, the bottom is the lower (“SFC” means surface).<br>${ok?'':'<i class="ph ph-map-pin" aria-hidden="true"></i> The amber tag on the sectional (left) shows how the chart prints it, in hundreds of feet: ceiling over floor.<br>'}`;
     next();
   });
 }

@@ -2,8 +2,9 @@
 
 ## "Use my location" must feed every learning tab
 The **📍 Use my location** checkbox (Sectional Practice toolbar) sets the shared `LOCAL` object in `index.html`:
-`LOCAL.on`, `LOCAL.airports` (nearest first, with ident, name, city, elevation, distance, direction),
-`LOCAL.pick()` and `LOCAL.subscribe(fn)`.
+`LOCAL.on`, `LOCAL.airports` (public-looking fields within the radius slider, default 150 mi, max 300 mi, nearest first,
+with ident, name, city, elevation, distance in NM via `nm`, direction), `LOCAL.mi(nm)`, `LOCAL.setRadius(mi)`,
+`LOCAL.pick()` and `LOCAL.subscribe(fn)` (called again whenever the radius changes).
 
 Rule from the owner: **every other learning tab must use the local airports as its examples when the box is on**
 (and fall back to a fixed example airport when it is off). Planned topics and how local airports plug in:
