@@ -100,7 +100,9 @@ footer{padding:40px 5vw;border-top:1px solid var(--line);color:var(--mute);font-
     <label><input type="checkbox" class="cls" value="C" checked> C</label>
     <label><input type="checkbox" class="cls" value="D" checked> D</label>
     <label><input type="checkbox" class="cls" value="E" checked> E</label>
+    <label title="Asks your browser for your location. It never leaves this page."><input type="checkbox" id="useLoc"> 📍 Use my location</label>
     <button class="btn sm" id="newq">▶ Practice mode</button>
+    <div class="mono" id="locStat" style="flex-basis:100%;color:var(--mute);font-size:12px" hidden></div>
   </div>
   <div class="split">
     <div class="pane"><div id="mapL"></div><div class="chip mono">VFR SECTIONAL · 3D</div></div>
@@ -288,11 +290,78 @@ mapR.on('click',e=>{
   new maplibregl.Popup().setLngLat(e.lngLat).setHTML(rows.join('<hr style="border:0;border-top:1px solid #1e2a3b;margin:8px 0">')).addTo(mapR);
 });
 
+// ---------- local airports (shared: every learning tab should use LOCAL) ----------
+// LOCAL.on        true when the "Use my location" box is ticked and airports were found
+// LOCAL.airports  nearest airports [{ident,name,city,type,lat,lon,elev,nm,dir}] sorted by distance
+// LOCAL.pick()    a random nearby airport (bigger fields are favoured)
+// LOCAL.subscribe(fn)  fn(LOCAL) runs whenever the location is switched on, off or updated
+const LOCAL={on:false,pos:null,airports:[],_subs:[],
+  subscribe(fn){this._subs.push(fn)},_emit(){this._subs.forEach(f=>{try{f(this)}catch(e){console.error(e)}})},
+  rad:d=>d*Math.PI/180,
+  nm(la1,lo1,la2,lo2){const R=3440.065,p=this.rad,a=Math.sin(p(la2-la1)/2)**2+Math.cos(p(la1))*Math.cos(p(la2))*Math.sin(p(lo2-lo1)/2)**2;return 2*R*Math.asin(Math.sqrt(a))},
+  bearing(la1,lo1,la2,lo2){const p=this.rad,y=Math.sin(p(lo2-lo1))*Math.cos(p(la2)),x=Math.cos(p(la1))*Math.sin(p(la2))-Math.sin(p(la1))*Math.cos(p(la2))*Math.cos(p(lo2-lo1));return (Math.atan2(y,x)*180/Math.PI+360)%360},
+  compass(b){return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(b/22.5)%16]},
+  pick(){const w=this.airports.slice(0,10).map(a=>({a,w:a.type==='large_airport'?3:a.type==='medium_airport'?2:1}));let t=w.reduce((s,x)=>s+x.w,0)*Math.random();for(const x of w){t-=x.w;if(t<=0)return x.a}return w[0].a}
+};
+const APT_CSV='https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv';
+function csvLine(l){const o=[];let c='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(q){if(ch==='"'){if(l[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}else if(ch==='"')q=true;else if(ch===','){o.push(c);c=''}else c+=ch}o.push(c);return o}
+async function loadAirportsNear(lat,lon){
+  const key='chartroom.localApts',k=lat.toFixed(1)+','+lon.toFixed(1);
+  try{const c=JSON.parse(localStorage.getItem(key)||'null');if(c&&c.k===k&&Date.now()-c.t<30*864e5&&c.airports.length)return c.airports}catch(e){}
+  const txt=await (await fetch(APT_CSV)).text();
+  const lines=txt.split('\n');const h=csvLine(lines[0]);const ix=n=>h.indexOf(n);
+  const I={id:ix('ident'),type:ix('type'),name:ix('name'),lat:ix('latitude_deg'),lon:ix('longitude_deg'),el:ix('elevation_ft'),city:ix('municipality'),icao:ix('icao_code'),gps:ix('gps_code')};
+  const ok=new Set(['large_airport','medium_airport','small_airport']);
+  const all=[];
+  for(let i=1;i<lines.length;i++){
+    const l=lines[i];if(!l)continue;
+    const f=csvLine(l);if(!ok.has(f[I.type]))continue;
+    const la=+f[I.lat],lo=+f[I.lon];if(Math.abs(la-lat)>3||Math.abs(lo-lon)>4.5)continue;   // cheap pre-filter before the real distance
+    const nm=LOCAL.nm(lat,lon,la,lo);
+    all.push({ident:f[I.icao]||f[I.gps]||f[I.id],name:f[I.name],city:f[I.city],type:f[I.type],lat:la,lon:lo,elev:Math.round(+f[I.el])||0,nm,dir:LOCAL.compass(LOCAL.bearing(lat,lon,la,lo))});
+  }
+  all.sort((a,b)=>a.nm-b.nm);
+  const list=all.filter(a=>a.nm<=40);const out=(list.length>=3?list:all.filter(a=>a.nm<=120)).slice(0,14);
+  try{localStorage.setItem(key,JSON.stringify({k,t:Date.now(),airports:out}))}catch(e){}
+  return out;
+}
+function showLocalOnMap(){
+  if(!mapR.getSource('local')){
+    mapR.addSource('local',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    mapR.addLayer({id:'local-dot',type:'circle',source:'local',paint:{'circle-radius':5,'circle-color':'#ffb020','circle-stroke-color':'#0a0e14','circle-stroke-width':2}});
+    mapR.addLayer({id:'local-lbl',type:'symbol',source:'local',layout:{'text-field':['get','ident'],'text-font':['Open Sans Regular'],'text-size':12,'text-offset':[0,1.1],'text-anchor':'top','text-allow-overlap':true},paint:{'text-color':'#ffb020','text-halo-color':'#0a0e14','text-halo-width':1.6}});
+  }
+  mapR.getSource('local').setData({type:'FeatureCollection',features:LOCAL.on?LOCAL.airports.map(a=>({type:'Feature',properties:{ident:a.ident},geometry:{type:'Point',coordinates:[a.lon,a.lat]}})):[]});
+}
+function nearTxt(){
+  if(!near)return '';
+  const a=near.a;return `<br><span class="mono" style="color:var(--amber);font-size:13px">📍 The pin is ${near.nm.toFixed(1)} NM ${near.dir} of ${a.name}${a.ident?' ('+a.ident+')':''}${a.city?', '+a.city:''}, field elevation ${a.elev.toLocaleString()} ft. Find it on the chart.</span>`;
+}
+async function enableLocation(){
+  const box=$('useLoc'),st=$('locStat');st.hidden=false;
+  const fail=m=>{box.checked=false;LOCAL.on=false;LOCAL.airports=[];st.textContent=m;showLocalOnMap();LOCAL._emit()};
+  if(!navigator.geolocation)return fail('This browser cannot share a location. Using the built-in examples.');
+  st.textContent='Waiting for your browser to share your location…';
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    try{
+      const lat=pos.coords.latitude,lon=pos.coords.longitude;
+      st.textContent='Finding airports near you…';
+      const list=await loadAirportsNear(lat,lon);
+      if(!list.length)return fail('No airports found near you. Using the built-in examples.');
+      LOCAL.pos={lat,lon};LOCAL.airports=list;LOCAL.on=true;
+      st.textContent=`Using your location: ${list.length} airports nearby. Nearest: ${list[0].name} (${list[0].ident}), ${list[0].nm.toFixed(1)} NM ${list[0].dir}. Your position stays in this browser.`;
+      showLocalOnMap();LOCAL._emit();
+      mapL.jumpTo({center:[list[0].lon,list[0].lat],zoom:10.5});
+    }catch(e){fail('Could not load the airport list (check your connection). Using the built-in examples.')}
+  },err=>fail(err.code===1?'Location permission was denied. Allow it in your browser (the lock icon by the address), then tick the box again.':'Could not get your location'+(location.protocol==='file:'?'. If you opened this file directly, serve the folder from localhost instead (python3 -m http.server).':'. Try again.')),{enableHighAccuracy:false,timeout:15000,maximumAge:600000});
+}
+$('useLoc').onchange=e=>{if(e.target.checked)enableLocation();else{LOCAL.on=false;LOCAL.airports=[];$('locStat').textContent='Location off. Using the built-in examples.';showLocalOnMap();LOCAL._emit()}};
+
 // ---------- practice mode ----------
 const SPOTS=[[47.449,-122.309],[47.907,-122.282],[47.268,-122.578],[45.589,-122.595],[39.856,-104.674],[40.788,-111.978],[30.194,-97.67],[42.364,-71.005],[33.943,-118.408],[41.978,-87.904],[33.64,-84.427],[25.793,-80.29],[36.08,-115.152],[44.88,-93.217],[39.049,-77.46]];
 const KEY={B:'Class B (solid blue) — surface to ~10,000 ft MSL around the nation’s busiest airports; needs an ATC clearance.',C:'Class C (solid magenta) — two-way radio contact required before entering.',D:'Class D (dashed blue) — towered airports; two-way radio contact required before entering.',E:'Class E (dashed magenta / shaded vignette) — controlled airspace; no clearance needed under VFR, but weather minimums apply.',G:'Class G — uncontrolled airspace; no charted boundary here.'};
 const PRI={B:4,C:3,D:2,E:1};
-let quizActive=false,pin=null,mk=[],score=[0,0],cur=null;
+let quizActive=false,pin=null,mk=[],score=[0,0],cur=null,near=null;
 const shuffle=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
 
 async function pointAir(lon,lat){
@@ -359,8 +428,16 @@ function next(){const n=document.createElement('button');n.className='btn sm';n.
 async function startQuiz(){
   clearReveal();
   mk.forEach(m=>m.remove());mk=[];
-  const [la,lo]=SPOTS[Math.floor(Math.random()*SPOTS.length)];
-  pin=[lo+(Math.random()-.5)*.3,la+(Math.random()-.5)*.25];
+  near=null;
+  if(LOCAL.on&&LOCAL.airports.length){
+    const a=LOCAL.pick();
+    const r=(Math.random()*3.2+0.4)/60, th=Math.random()*2*Math.PI;     // 0.4 to 3.6 NM from the field
+    pin=[a.lon+r*Math.sin(th)/Math.cos(a.lat*Math.PI/180),a.lat+r*Math.cos(th)];
+    near={a,nm:LOCAL.nm(a.lat,a.lon,pin[1],pin[0]),dir:LOCAL.compass(LOCAL.bearing(a.lat,a.lon,pin[1],pin[0]))};
+  }else{
+    const [la,lo]=SPOTS[Math.floor(Math.random()*SPOTS.length)];
+    pin=[lo+(Math.random()-.5)*.3,la+(Math.random()-.5)*.25];
+  }
   $('link').checked=true;setQuizVis(true);mapR.getPopup?.();
   mapL.jumpTo({center:pin,zoom:10.5,pitch:50,bearing:0});
   mk=[mapL,mapR].map(m=>new maplibregl.Marker({color:'#ffb020'}).setLngLat(pin).addTo(m));
@@ -368,7 +445,7 @@ async function startQuiz(){
   let fs;try{fs=await pointAir(pin[0],pin[1])}catch(e){$('q').innerHTML='Airspace feed unavailable right now. Try again.';setQuizVis(false);return}
   const top=fs.sort((a,b)=>(PRI[b.properties.CLASS]||0)-(PRI[a.properties.CLASS]||0))[0];
   const cls=top?top.properties.CLASS:'G';
-  showQ('<b>Q1.</b> Use the sectional (left). What is the <u>highest-priority airspace class</u> at the amber pin?',['Class B','Class C','Class D','Class E','Class G'],(t,b)=>{
+  showQ('<b>Q1.</b> Use the sectional (left). What is the <u>highest-priority airspace class</u> at the amber pin?'+nearTxt(),['Class B','Class C','Class D','Class E','Class G'],(t,b)=>{
     const ok=t==='Class '+cls;mark(ok,b,'Class '+cls);setQuizVis(false);
     const p=top?.properties;
     if(!ok)revealOnChart(top,cls,false);
